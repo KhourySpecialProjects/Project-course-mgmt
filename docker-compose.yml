@@ -1,0 +1,85 @@
+# Local development stack: three containers that talk to each other.
+#
+#   web  (Next.js, port 3000)  -->  api  (FastAPI, port 8000)  -->  db  (Postgres, port 5432)
+#
+# Start everything:   docker compose up --build
+# Stop everything:    docker compose down
+# See docs/getting-started.md for more.
+
+name: course-mgmt
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coursemgmt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coursemgmt}
+      POSTGRES_DB: ${POSTGRES_DB:-coursemgmt}
+    ports:
+      # Exposed so you can connect with a desktop database tool if you like.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: ./api
+      target: dev
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside the Docker network the database is reachable by its service name.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the source so code changes reload instantly without a rebuild.
+      - ./api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: ./web
+      target: dev
+    restart: unless-stopped
+    environment:
+      # Where the Next.js server forwards /api/* requests (see web/next.config.ts).
+      API_INTERNAL_URL: http://api:8000
+      # Check for file changes by polling, so edits made on your computer are
+      # picked up reliably inside the container (on every OS).
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount the source so code changes show up instantly without a rebuild.
+      - ./web:/app
+      # ...but keep the container's own node_modules and build cache.
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  db-data:

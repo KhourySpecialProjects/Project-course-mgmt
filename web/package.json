@@ -1,0 +1,40 @@
+{
+  "name": "course-mgmt-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:docker": "next dev --webpack --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@mantine/core": "^9.8.1",
+    "@mantine/form": "^9.8.1",
+    "@mantine/hooks": "^9.8.1",
+    "@mantine/notifications": "^9.8.1",
+    "@tabler/icons-react": "^3.52.0",
+    "next": "16.4.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "postcss": "^8.5.33",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1",
+    "prettier": "^3.10.1",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
