@@ -31,32 +31,21 @@ Create `api/app/modules/slack/__init__.py`:
 Create `api/app/modules/slack/module.py`. Start by copying `api/app/modules/github/module.py`, then adapt it:
 
 ```python
-import os
-
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 
-from app.auth.dependencies import require_user
-from app.modules.base import ToolModule
+from app.auth.dependencies import CurrentUser, require_user
+from app.core.db import DbSession
+from app.credentials.spec import CredentialScope, CredentialSpec
+from app.modules.base import ToolModule, ToolStatus, status_for
 
 # Every endpoint in this router requires a logged-in user.
 router = APIRouter(dependencies=[Depends(require_user)])
 
 
-def is_configured() -> bool:
-    return bool(os.environ.get("SLACK_BOT_TOKEN"))
-
-
-class SlackStatus(BaseModel):
-    configured: bool
-    message: str
-
-
-@router.get("/status", response_model=SlackStatus)
-def status() -> SlackStatus:
-    if is_configured():
-        return SlackStatus(configured=True, message="Slack token found.")
-    return SlackStatus(configured=False, message="Set SLACK_BOT_TOKEN in .env.")
+@router.get("/status", response_model=ToolStatus)
+def status(user: CurrentUser, db: DbSession) -> ToolStatus:
+    # Reports "configured" once every credential below is saved.
+    return status_for(module, db, user)
 
 
 module = ToolModule(
@@ -64,9 +53,19 @@ module = ToolModule(
     name="Slack",
     description="Create a channel per project team and invite its members.",
     router=router,
-    is_configured=is_configured,
+    credentials=[
+        CredentialSpec(
+            key="slack_bot_token",
+            label="Slack bot token",
+            description="Lets the workbench create channels in your Slack workspace.",
+            scope=CredentialScope.SYSTEM,  # one shared bot for the whole app
+            placeholder="xoxb-...",
+        ),
+    ],
 )
 ```
+
+The `credentials` list declares which API keys the module needs. Each one automatically appears in the UI for people to fill in: in **System settings** for `SYSTEM` scope, or on each user's **Account → API keys** tab for `USER` scope. See [API keys and tokens](api-keys.md) for choosing a scope.
 
 Register it in [`api/app/modules/__init__.py`](../api/app/modules/__init__.py):
 
@@ -80,9 +79,7 @@ MODULES: list[ToolModule] = [
 ]
 ```
 
-The router is now mounted at `/api/tools/slack/`. Open <http://localhost:8000/api/docs> and you should see a **slack** section with `GET /api/tools/slack/status`.
-
-Add the new setting to [`.env.example`](../.env.example) (with an empty value) so teammates know it exists. Then add it to your own `.env` and restart the API container (`docker compose up -d api`), because environment variables are only read at start-up.
+The router is now mounted at `/api/tools/slack/`. Open <http://localhost:8000/api/docs> and you should see a **slack** section with `GET /api/tools/slack/status`. As a superuser, open **System settings** and the *Slack bot token* is listed there, ready to be added.
 
 ## Step 2: Test it
 
@@ -93,12 +90,13 @@ def test_slack_status_requires_login(client):
     assert client.get("/api/tools/slack/status").status_code == 401
 
 
-def test_slack_status(client, make_user, login):
-    make_user("someone@example.com")
-    login("someone@example.com")
-    r = client.get("/api/tools/slack/status")
-    assert r.status_code == 200
-    assert r.json()["configured"] in (True, False)
+def test_slack_status_follows_system_token(client, make_user, login):
+    make_user("admin@example.com", is_superuser=True)
+    login("admin@example.com")
+    assert client.get("/api/tools/slack/status").json()["configured"] is False
+
+    client.put("/api/credentials/system/slack_bot_token", json={"value": "xoxb-test-token-1234"})
+    assert client.get("/api/tools/slack/status").json()["configured"] is True
 ```
 
 Then update the expected set of ids in `test_tools_listing` in `tests/test_bootstrap_and_tools.py`, and run `make test`.
@@ -154,7 +152,7 @@ When the module does real work, keep the same layering used in the rest of the A
 
 | File | Responsibility |
 | ---- | -------------- |
-| `client.py` | **Integration adapter.** The only file that talks to the external API. Handles the token, base URL, pagination, rate limits, and retries. Returns plain Python objects. |
+| `client.py` | **Integration adapter.** The only file that talks to the external API. Takes the token as an argument (fetched with `get_user_credential` / `get_system_credential`), and handles the base URL, pagination, rate limits, and retries. Returns plain Python objects. |
 | `service.py` | **Business logic.** "Create a channel for every team in course X." Reads the course model from the database, calls `client.py`. |
 | `schemas.py` | Request/response models for the endpoints. |
 | `module.py` | Endpoints: validate input, call the service, return results. |
@@ -163,7 +161,7 @@ Guidelines:
 
 - **Make bulk operations idempotent.** Running "create repos for all teams" twice should not create duplicates or fail; check what exists first and skip it. Instructors will re-run jobs after partial failures.
 - **Support a dry run.** Before changing anything, an operation should be able to return a list of what it *would* do. A `dry_run: bool` parameter on the service function is a simple start.
-- **Never log or return tokens.** Read them from settings/environment; don't put them in responses or error messages.
+- **Never log or return tokens.** Read them with the credentials service when needed; don't put them in responses or error messages.
 - **Test without the network.** In tests, replace the client with a fake (e.g. using pytest's `monkeypatch`) so tests are fast and don't need real credentials.
 - **Long operations belong in the job runner** (planned). Until it exists, keep each request short.
 
@@ -171,7 +169,7 @@ Guidelines:
 
 - [ ] `api/app/modules/<id>/module.py` exports `module`
 - [ ] Added to `MODULES` in `api/app/modules/__init__.py`
-- [ ] New settings documented in `.env.example`
+- [ ] API keys the module needs are declared in its `credentials` list
 - [ ] Tests in `api/tests/`
 - [ ] UI in `web/src/modules/<id>/`
 - [ ] Page in `web/src/app/(app)/tools/<id>/page.tsx`

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.auth import service
+from app.auth.cookies import clear_session_cookie, set_session_cookie
 from app.auth.dependencies import CurrentUser
 from app.auth.schemas import ChangePasswordRequest, LoginRequest
 from app.core.config import get_settings
@@ -23,16 +24,7 @@ def login(body: LoginRequest, response: Response, db: DbSession) -> UserRead:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     token, expires_at = service.start_session(db, user)
-    settings = get_settings()
-    response.set_cookie(
-        key=settings.session_cookie_name,
-        value=token,
-        expires=expires_at,
-        httponly=True,  # JavaScript in the browser cannot read it
-        secure=settings.session_cookie_secure,
-        samesite="lax",  # not sent on cross-site POSTs (basic CSRF protection)
-        path="/",
-    )
+    set_session_cookie(response, token, expires_at)
     return UserRead.model_validate(user)
 
 
@@ -42,7 +34,7 @@ def logout(request: Request, response: Response, db: DbSession) -> None:
     token = request.cookies.get(settings.session_cookie_name)
     if token:
         service.end_session(db, token)
-    response.delete_cookie(settings.session_cookie_name, path="/")
+    clear_session_cookie(response)
 
 
 @router.get("/me", response_model=UserRead)

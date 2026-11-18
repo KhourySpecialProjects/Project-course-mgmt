@@ -17,6 +17,9 @@ from typing import Literal
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Default for local development only. Production must set APP_SECRET_KEY.
+DEV_SECRET_KEY = "dev-only-insecure-secret-key-change-me"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -46,6 +49,16 @@ class Settings(BaseSettings):
     # Set to true when the site is served over HTTPS so browsers only send the
     # cookie over encrypted connections.
     session_cookie_secure: bool = False
+
+    # --- Invitations ---------------------------------------------------------
+    # How long a one-time invite link stays valid, in hours (default: 7 days).
+    invite_ttl_hours: int = 24 * 7
+
+    # --- Encryption ----------------------------------------------------------
+    # Used to encrypt stored API keys and tokens (see app/core/crypto.py).
+    # Use a long random value in production and keep it secret. If it changes,
+    # previously saved API keys can no longer be read and must be re-entered.
+    app_secret_key: SecretStr = SecretStr(DEV_SECRET_KEY)
 
     @property
     def database_url(self) -> str:

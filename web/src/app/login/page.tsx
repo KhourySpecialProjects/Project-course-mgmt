@@ -1,21 +1,12 @@
 "use client";
 
-import {
-  Alert,
-  Button,
-  Center,
-  Paper,
-  PasswordInput,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
+import { Alert, Button, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { IconAlertCircle, IconSchool } from "@tabler/icons-react";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
+import { AuthCard } from "@/components/AuthCard";
 import { useAuth } from "@/components/AuthProvider";
 import { FullPageLoader } from "@/components/FullPageLoader";
 
@@ -68,43 +59,36 @@ function LoginForm() {
   if (user === undefined || user) return <FullPageLoader />;
 
   return (
-    <Center mih="100vh" p="md">
-      <Paper withBorder shadow="sm" p="xl" w="100%" maw={400}>
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <Stack>
-            <Stack gap={4} align="center">
-              <IconSchool size={40} stroke={1.5} />
-              <Title order={3}>Course Workbench</Title>
-              <Text size="sm" c="dimmed">
-                Sign in to continue
-              </Text>
-            </Stack>
+    <AuthCard subtitle="Sign in to continue">
+      <form onSubmit={form.onSubmit(handleSubmit)}>
+        <Stack>
+          {error && (
+            <Alert color="red" icon={<IconAlertCircle />}>
+              {error}
+            </Alert>
+          )}
 
-            {error && (
-              <Alert color="red" icon={<IconAlertCircle />}>
-                {error}
-              </Alert>
-            )}
-
-            <TextInput
-              label="Email"
-              type="email"
-              autoComplete="email"
-              required
-              {...form.getInputProps("email")}
-            />
-            <PasswordInput
-              label="Password"
-              autoComplete="current-password"
-              required
-              {...form.getInputProps("password")}
-            />
-            <Button type="submit" loading={submitting} fullWidth mt="sm">
-              Sign in
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
-    </Center>
+          <TextInput
+            label="Email"
+            type="email"
+            autoComplete="email"
+            required
+            {...form.getInputProps("email")}
+          />
+          <PasswordInput
+            label="Password"
+            autoComplete="current-password"
+            required
+            {...form.getInputProps("password")}
+          />
+          <Button type="submit" loading={submitting} fullWidth mt="sm">
+            Sign in
+          </Button>
+          <Text size="xs" c="dimmed" ta="center">
+            New here? Ask an administrator for an invite link.
+          </Text>
+        </Stack>
+      </form>
+    </AuthCard>
   );
 }

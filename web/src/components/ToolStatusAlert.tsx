@@ -1,7 +1,8 @@
 "use client";
 
-import { Alert, Skeleton } from "@mantine/core";
+import { Alert, Button, Skeleton, Text } from "@mantine/core";
 import { IconAlertTriangle, IconCircleCheck } from "@tabler/icons-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
@@ -33,7 +34,12 @@ export function ToolStatusAlert({ toolId }: { toolId: string }) {
     </Alert>
   ) : (
     <Alert color="yellow" icon={<IconAlertTriangle />} title="Not configured yet">
-      {status.message}
+      <Text size="sm">{status.message}</Text>
+      {status.missing_user_credentials.length > 0 && (
+        <Button component={Link} href="/account?tab=api-keys" size="xs" mt="sm" variant="white">
+          Add API key
+        </Button>
+      )}
     </Alert>
   );
 }

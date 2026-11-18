@@ -43,7 +43,7 @@ cd Project-course-mgmt
 
 ## 3. Create your `.env` file
 
-Configuration (passwords, ports, API tokens) lives in a file called `.env` in the project root. It is **not** committed to git, so each person has their own. Start from the example:
+Server configuration (database passwords, ports, the superuser) lives in a file called `.env` in the project root. It is **not** committed to git, so each person has their own. Start from the example:
 
 ```bash
 cp .env.example .env
@@ -53,6 +53,8 @@ Open `.env` in your editor. For local development the defaults work as-is, but t
 
 - `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD`: the account you'll log in with. It is created automatically the first time the app starts.
 - `POSTGRES_PORT`: change this if something else on your machine already uses port 5432.
+
+API keys for GitHub, Linear, and so on do **not** go in `.env`; you'll add those inside the app.
 
 ## 4. Start the app
 
@@ -76,7 +78,8 @@ Open <http://localhost:3000>. You'll be sent to the sign-in page. Use the `SUPER
 
 Things to try:
 
-- **Users** (left sidebar, under *Admin*): add a second account, then sign in as that person in a private browser window. Non-superusers don't see the Admin section.
+- **Users** (left sidebar, under *Admin*): click **Invite user**, copy the one-time link, and open it in a private browser window to create a second account. Non-superusers don't see the Admin section.
+- **API keys**: as the new user, open **GitHub** in the sidebar and follow *Add API key* to save a (test) token. As the superuser, open **System settings** to manage app-wide keys like the Anthropic API key. See [API keys and tokens](api-keys.md).
 - **Account** (menu under your name, top right): change your password.
 - **The moon/sun button** (top right): switch between light and dark mode.
 - **API docs** at <http://localhost:8000/api/docs>: every API endpoint, with a *Try it out* button. Endpoints that need a login use the session cookie. Browsers share cookies between ports on the same host, so once you're signed in at `localhost:3000`, the docs page can call protected endpoints too. You can also sign in from the docs page with `POST /api/auth/login`.

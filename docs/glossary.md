@@ -8,6 +8,8 @@ Terms you'll run into in this codebase and its docs.
 
 **AppShell** — The Mantine component that provides the page frame: header, sidebar, and content area. Used in `web/src/components/AppLayout.tsx`.
 
+**API key / token** — A secret string that lets the app call an outside service (GitHub, Linear, Anthropic) on someone's behalf. Stored encrypted; see [API keys and tokens](api-keys.md).
+
 **Argon2** — A password-hashing algorithm designed to be slow to brute-force. Used to store passwords.
 
 **CI (continuous integration)** — Automated checks (tests, lint, builds) that run on GitHub for every pull request. Configured in `.github/workflows/ci.yml`.
@@ -24,6 +26,8 @@ Terms you'll run into in this codebase and its docs.
 
 **Docker Compose** — The tool that starts and connects several containers from one file, `docker-compose.yml`.
 
+**Encryption** — Scrambling data so it can only be read with a key. Unlike a hash, it can be reversed by whoever has the key. Used for stored API keys.
+
 **Endpoint / route** — One URL + HTTP method the API responds to, e.g. `GET /api/users`.
 
 **Environment variable** — A named setting given to a program from outside its code, e.g. `POSTGRES_PASSWORD`. Locally they come from `.env`.
@@ -37,6 +41,8 @@ Terms you'll run into in this codebase and its docs.
 **HTTP-only cookie** — A cookie the browser's JavaScript can't read, which protects the session token from malicious scripts.
 
 **Idempotent** — Safe to run more than once with the same result. Bulk operations should be idempotent so they can be re-run after a partial failure.
+
+**Invite link** — A one-time URL a superuser creates so a new person can set their password and join. See [Authentication](authentication.md#invitations).
 
 **Lint / linter** — A tool that flags likely bugs and style problems without running the code. Here: `ruff` (Python) and `eslint` (TypeScript).
 
@@ -60,7 +66,7 @@ Terms you'll run into in this codebase and its docs.
 
 **Session** — A record that a particular browser is logged in. Stored in the `auth_sessions` table and identified by the `session` cookie.
 
-**Superuser** — An account with admin rights (can manage users). The first one is created from `SUPERUSER_EMAIL` / `SUPERUSER_PASSWORD`.
+**Superuser** — An account with admin rights (can invite and manage users, and manage system settings). The first one is created from `SUPERUSER_EMAIL` / `SUPERUSER_PASSWORD`.
 
 **Tool module** — A self-contained integration (GitHub, Linear, …) that plugs into the app. See [Adding a tool module](adding-a-tool-module.md).
 

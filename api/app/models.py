@@ -6,6 +6,8 @@ Alembic's autogenerate only sees tables whose models have been imported.
 
 from app.auth.models import AuthSession
 from app.core.db import Base
+from app.credentials.models import Credential
+from app.invites.models import Invite
 from app.users.models import User
 
-__all__ = ["AuthSession", "Base", "User"]
+__all__ = ["AuthSession", "Base", "Credential", "Invite", "User"]

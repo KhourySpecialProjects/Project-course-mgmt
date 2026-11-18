@@ -23,7 +23,9 @@ def create_user(
     password: str,
     full_name: str = "",
     is_superuser: bool = False,
+    commit: bool = True,
 ) -> User:
+    """Create a user. Pass ``commit=False`` to save it as part of a larger transaction."""
     user = User(
         email=normalize_email(email),
         full_name=full_name,
@@ -32,8 +34,11 @@ def create_user(
         is_active=True,
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    if commit:
+        db.commit()
+        db.refresh(user)
+    else:
+        db.flush()  # sends the INSERT so user.id is available, without committing
     return user
 
 

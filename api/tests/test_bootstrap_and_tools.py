@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -49,3 +50,19 @@ def test_tools_listing(
     r = client.get("/api/tools/github/status")
     assert r.status_code == 200
     assert "configured" in r.json()
+
+
+def test_production_refuses_dev_secret_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core import bootstrap
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    try:
+        with pytest.raises(SystemExit, match="APP_SECRET_KEY"):
+            bootstrap.check_production_settings()
+        monkeypatch.setenv("APP_SECRET_KEY", "a-long-random-production-secret-value")
+        monkeypatch.setenv("SUPERUSER_PASSWORD", "a-strong-production-password")
+        get_settings.cache_clear()
+        bootstrap.check_production_settings()  # no exit
+    finally:
+        get_settings.cache_clear()

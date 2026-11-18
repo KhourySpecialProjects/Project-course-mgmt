@@ -21,9 +21,11 @@ import { useDisclosure } from "@mantine/hooks";
 import {
   IconChevronDown,
   IconHome,
+  IconKey,
   IconLogout,
   IconMoon,
   IconSchool,
+  IconSettings,
   IconSun,
   IconUserCog,
   IconUsers,
@@ -87,6 +89,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Menu.Item component={Link} href="/account" leftSection={<IconUserCog size={16} />}>
                   Account
                 </Menu.Item>
+                <Menu.Item
+                  component={Link}
+                  href="/account?tab=api-keys"
+                  leftSection={<IconKey size={16} />}
+                >
+                  My API keys
+                </Menu.Item>
                 <Menu.Item leftSection={<IconLogout size={16} />} onClick={logout}>
                   Log out
                 </Menu.Item>
@@ -111,6 +120,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 Admin
               </Text>
               {navItem("/admin/users", "Users", IconUsers)}
+              {navItem("/admin/settings", "System settings", IconSettings)}
             </>
           )}
         </AppShell.Section>

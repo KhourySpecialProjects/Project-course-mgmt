@@ -49,7 +49,8 @@ Each tier runs in its own Docker container, wired together by [`docker-compose.y
 | [Getting started](docs/getting-started.md) | You want to run the app for the first time. |
 | [Architecture](docs/architecture.md) | You want to understand how the pieces fit together and where code lives. |
 | [Development workflow](docs/development-workflow.md) | You're about to write code: the day-to-day loop, tests, linting, branches, and pull requests. |
-| [Authentication](docs/authentication.md) | You're working on login, users, permissions, or the superuser. |
+| [Authentication](docs/authentication.md) | You're working on login, invitations, users, permissions, or the superuser. |
+| [API keys and tokens](docs/api-keys.md) | You need a key for GitHub, Linear, Anthropic, etc., or are adding one. |
 | [Database & migrations](docs/database-and-migrations.md) | You're adding or changing a table. |
 | [Adding a tool module](docs/adding-a-tool-module.md) | You're building a new integration (or the real GitHub/Linear tools). |
 | [Troubleshooting](docs/troubleshooting.md) | Something isn't working. |
@@ -98,7 +99,8 @@ The skeleton is in place:
 - [x] Three-tier app (Next.js → FastAPI → Postgres), each in its own container
 - [x] Email/password login with secure session cookies
 - [x] Superuser created automatically from environment variables
-- [x] User management page for superusers
+- [x] User management for superusers, with one-time invite links for new users
+- [x] Encrypted API key storage: personal keys per user, system-wide keys for admins
 - [x] Tool-module registry with placeholder GitHub and Linear modules
 - [x] Automated tests, linting, type-checking, and CI
 - [ ] Course model (courses, students, teams, projects)

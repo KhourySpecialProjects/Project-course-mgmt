@@ -26,7 +26,7 @@ Copy this into your PR description and tick what applies:
 - [ ] New/changed API endpoints have tests (success + not-allowed cases)
 - [ ] Permissions are enforced in the API, not only hidden in the UI
 - [ ] Model changes come with a reviewed Alembic migration
-- [ ] New settings are added to `.env.example` (never commit real secrets)
+- [ ] New server settings are added to `.env.example`; new third-party keys are declared as `CredentialSpec`s (never commit real secrets)
 - [ ] Docs updated if behavior or setup changed
 ```
 

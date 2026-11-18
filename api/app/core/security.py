@@ -4,9 +4,9 @@ Passwords are never stored. We store an Argon2 *hash* of the password, which
 can be checked against a login attempt but cannot be turned back into the
 original password.
 
-Session tokens work the same way: the browser holds the random token in a
-cookie, and the database stores only a SHA-256 hash of it. Someone who reads
-the database cannot use the hashes to log in.
+Random tokens (login sessions, invite links) work the same way: the user
+holds the random token (in a cookie or a link), and the database stores only
+a SHA-256 hash of it. Someone who reads the database cannot use the hashes.
 """
 
 import hashlib
@@ -27,10 +27,11 @@ def verify_password(password: str, password_hash: str) -> bool:
     return _password_hash.verify(password, password_hash)
 
 
-def new_session_token() -> str:
-    """A long, random, URL-safe token for the session cookie."""
+def new_token() -> str:
+    """A long, random, URL-safe token (for session cookies and invite links)."""
     return secrets.token_urlsafe(32)
 
 
-def hash_session_token(token: str) -> str:
+def hash_token(token: str) -> str:
+    """SHA-256 of a token, for storing in the database."""
     return hashlib.sha256(token.encode()).hexdigest()

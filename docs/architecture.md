@@ -21,8 +21,9 @@ This page explains how the app is put together: the three tiers, how a request f
              │  SQL over postgresql://db:5432
              ▼
 ┌──────────────────────────┐
-│  db   (PostgreSQL 17)    │  Stores users, sessions, and the course model.
-│  container, port 5432    │  Data lives in the `db-data` Docker volume.
+│  db   (PostgreSQL 17)    │  Users, sessions, invites, encrypted API keys,
+│  container, port 5432    │  and (soon) the course model. Data lives in the
+│                          │  `db-data` Docker volume.
 └──────────────────────────┘
 ```
 
@@ -70,6 +71,8 @@ Because the browser sees a single origin, the login cookie is sent automatically
 │       ├── core/           Shared infrastructure: config, db, security, bootstrap
 │       ├── auth/           Login, logout, sessions, and the "require login" dependencies
 │       ├── users/          The User model and superuser-only user management
+│       ├── invites/        One-time invite links for new users
+│       ├── credentials/    Encrypted API keys: personal and system-wide
 │       └── modules/        Tool modules (github/, linear/) and their registry
 │
 └── web/                    ── TypeScript / Next.js ──
@@ -107,6 +110,8 @@ Next.js uses **file-based routing**: a `page.tsx` file's folder path is its URL.
 | `src/app/(app)/page.tsx` | `/` |
 | `src/app/(app)/account/page.tsx` | `/account` |
 | `src/app/(app)/admin/users/page.tsx` | `/admin/users` |
+| `src/app/(app)/admin/settings/page.tsx` | `/admin/settings` |
+| `src/app/invite/[token]/page.tsx` | `/invite/<anything>` (a *dynamic route*; the page reads the token from the URL) |
 | `src/app/(app)/tools/github/page.tsx` | `/tools/github` |
 
 A folder name in parentheses, like `(app)`, is a **route group**: it does not appear in the URL. It lets every page inside share [`(app)/layout.tsx`](../web/src/app/(app)/layout.tsx), which redirects logged-out visitors to `/login` and wraps the page in the sidebar and header.
@@ -117,10 +122,10 @@ Most pages start with `"use client"`, which makes them run in the browser. That'
 
 The README describes a **core shell** plus pluggable **tool modules**. The skeleton implements the plumbing:
 
-- **API side:** each module lives in `api/app/modules/<id>/module.py` and exports a `ToolModule` (id, name, description, router, and an `is_configured()` check). [`api/app/modules/__init__.py`](../api/app/modules/__init__.py) lists the installed modules. `main.py` mounts each module's router at `/api/tools/<id>/…`, and `GET /api/tools` lists them for the dashboard.
+- **API side:** each module lives in `api/app/modules/<id>/module.py` and exports a `ToolModule` (id, name, description, router, and the API keys it needs). [`api/app/modules/__init__.py`](../api/app/modules/__init__.py) lists the installed modules. `main.py` mounts each module's router at `/api/tools/<id>/…`, and `GET /api/tools` lists them for the dashboard.
 - **Web side:** each module's UI lives in `web/src/modules/<id>/`, its page in `web/src/app/(app)/tools/<id>/page.tsx`, and an entry in [`web/src/modules/registry.ts`](../web/src/modules/registry.ts) adds it to the sidebar and dashboard.
 
-GitHub and Linear are placeholders that only report whether their API token is set. [Adding a tool module](adding-a-tool-module.md) walks through building one.
+GitHub and Linear are placeholders that only report whether the current user has saved their token (see [API keys and tokens](api-keys.md)). [Adding a tool module](adding-a-tool-module.md) walks through building one.
 
 ### Planned pieces not yet built
 
@@ -132,4 +137,6 @@ These are described in the README and will slot into the existing structure:
 
 ## Configuration
 
-All settings come from **environment variables**, read in [`api/app/core/config.py`](../api/app/core/config.py). Locally, Docker Compose loads them from `.env`. In production you'd set them in your hosting platform. Never hard-code secrets in source files.
+Server settings come from **environment variables**, read in [`api/app/core/config.py`](../api/app/core/config.py). Locally, Docker Compose loads them from `.env`. In production you'd set them in your hosting platform. Never hard-code secrets in source files.
+
+API keys for outside services are different: people enter them in the app, and they're stored encrypted in the database. See [API keys and tokens](api-keys.md).

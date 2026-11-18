@@ -23,6 +23,8 @@ Run inside containers (`docker compose exec api …` / `docker compose exec web 
 - Enforce auth in the API with `CurrentUser` / `CurrentSuperuser` (`api/app/auth/dependencies.py`); UI checks are cosmetic.
 - Every schema change needs an Alembic migration. Never edit a migration that is already on `main`.
 - Keep `web/src/lib/types.ts` in sync with API schemas.
-- Settings go through `api/app/core/config.py` and are documented in `.env.example`. No secrets in code.
+- Server settings go through `api/app/core/config.py` and are documented in `.env.example`. No secrets in code.
+- Third-party API keys are NOT env vars: declare a `CredentialSpec` (module `credentials=[...]` or `CORE_CREDENTIALS` in `api/app/credentials/registry.py`) and read with `get_user_credential` / `get_system_credential`. Never return or log values.
+- New users join via invites (`api/app/invites/`); tokens are stored only as SHA-256 hashes.
 - Next.js 16 differs from older versions; consult `web/node_modules/next/dist/docs/` before using unfamiliar APIs.
 - Update docs in `docs/` when behavior or setup changes.

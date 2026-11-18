@@ -11,10 +11,11 @@ must be safe to run repeatedly:
 """
 
 import logging
+import sys
 
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
+from app.core.config import DEV_SECRET_KEY, get_settings
 from app.core.db import SessionLocal
 from app.users.service import create_user, get_user_by_email
 
@@ -46,8 +47,20 @@ def ensure_superuser(db: Session) -> None:
         logger.info("Superuser %s already exists", email)
 
 
+def check_production_settings() -> None:
+    """Refuse to start in production with development-only defaults."""
+    settings = get_settings()
+    if settings.environment != "production":
+        return
+    if settings.app_secret_key.get_secret_value() == DEV_SECRET_KEY:
+        sys.exit("APP_SECRET_KEY must be set to a long random value in production.")
+    if settings.superuser_password.get_secret_value() == "change-me-please":
+        sys.exit("SUPERUSER_PASSWORD must be changed from the default in production.")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    check_production_settings()
     with SessionLocal() as db:
         ensure_superuser(db)
 

@@ -85,6 +85,14 @@ Docker Desktop shares files between your computer and the containers through a v
   The web app at <http://localhost:3000> forwards `/api` to `localhost:8000` by default, so no other changes are needed.
 - On Windows, keep the project inside the WSL 2 filesystem (e.g. `~/code/...`), not under `/mnt/c/...`.
 
+### An API key shows "Needs re-entry"
+
+The key was saved while the server had a different `APP_SECRET_KEY`, so it can't be decrypted any more. Click **Replace** and enter it again. To avoid this, don't change `APP_SECRET_KEY` once keys are saved. See [API keys and tokens](api-keys.md#app_secret_key).
+
+### An invite link says it can't be used
+
+The message says why: already used, revoked, or expired. A superuser can create a fresh one with **New link** on the **Invitations** tab of the Users page. If the link says it's "not valid", it was probably cut off when copied; make sure the whole link was pasted.
+
 ### Tests fail with `database "coursemgmt_test" does not exist`
 
 The test database is created the first time the Postgres volume is initialized. If your volume predates that script (or you renamed `POSTGRES_DB`), create it once:

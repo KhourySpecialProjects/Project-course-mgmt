@@ -4,7 +4,7 @@ How login works, how to protect pages and endpoints, and how the superuser is cr
 
 ## Overview
 
-- Users sign in with **email and password**. There is no public sign-up; superusers create accounts on the **Users** page.
+- Users sign in with **email and password**. There is no public sign-up: new people join through a **one-time invite link** from a superuser (see [Invitations](#invitations)).
 - Passwords are stored as **Argon2 hashes**, never as plain text ([`api/app/core/security.py`](../api/app/core/security.py)).
 - A successful login creates a row in the `auth_sessions` table and sets a **`session` cookie** in the browser.
 - The cookie is **HTTP-only** (JavaScript can't read it, which limits damage from cross-site scripting) and **SameSite=Lax** (the browser won't send it on cross-site form posts, which blocks most cross-site request forgery).
@@ -43,8 +43,33 @@ if (user?.is_superuser) { /* show admin things */ }
 | `GET /api/auth/me` | logged in | The current user |
 | `POST /api/auth/change-password` | logged in | Change own password; logs out other sessions |
 | `GET /api/users` | superuser | List users |
-| `POST /api/users` | superuser | Create a user |
+| `GET /api/invites` | superuser | List invitations and their status |
+| `POST /api/invites` | superuser | Create an invite; the response includes the one-time token |
+| `POST /api/invites/{id}/revoke` | superuser | Cancel a pending invite |
+| `GET /api/invites/accept/{token}` | anyone with the link | Check the link; returns the invited email and name |
+| `POST /api/invites/accept/{token}` | anyone with the link | Set a password, create the account, and sign in |
+| `POST /api/users` | superuser | Create a user with a password directly (for scripts; the UI uses invites) |
 | `PATCH /api/users/{id}` | superuser | Change name, active, superuser flag, or password |
+
+## Invitations
+
+New accounts are created by invitation:
+
+1. A superuser opens **Users** (Admin section of the sidebar) and clicks **Invite user**, entering the person's email, an optional name, and whether they should be a superuser.
+2. The app shows a **one-time link** like `https://<your-site>/invite/<token>`, with buttons to copy it or open a pre-written email. The admin sends it however they like (email, Slack, …). The app doesn't send email itself.
+3. The invited person opens the link, confirms their name, chooses a password, and is signed in.
+
+Rules (see [`api/app/invites/service.py`](../api/app/invites/service.py)):
+
+- **One use.** After an account is created, the link stops working.
+- **Expires** after `INVITE_TTL_HOURS` (default 7 days).
+- **Shown once.** Like session tokens, only a SHA-256 hash of the invite token is stored, so the link can't be displayed again later. If it's lost, use **New link** on the **Invitations** tab.
+- **One working link per email.** Creating a new invite for an email automatically revokes any earlier pending one. That's how "resend" works.
+- **Revocable.** Pending invites can be revoked from the Invitations tab.
+- You can't invite an email that already has an account.
+- Two people submitting the same link at the same moment can't both succeed: the invite row is locked while the account is created.
+
+The link is built from the address the admin is using (`window.location.origin`), so it's correct whether the app runs on `localhost` or a real domain, as long as the admin creates invites from the same address the invitee will use.
 
 ## Protecting things
 
@@ -114,4 +139,5 @@ Add `--superuser` to make them a superuser.
 - Use a long, random `SUPERUSER_PASSWORD`, and change it after first login.
 - Serve the site over HTTPS and set `SESSION_COOKIE_SECURE=true`.
 - Use strong, unique database credentials.
-- Consider adding rate limiting on `/api/auth/login` (e.g. at the reverse proxy) to slow down password guessing.
+- Set `APP_SECRET_KEY` to a long random value (see [API keys](api-keys.md)). The API refuses to start in production with the development default.
+- Consider adding rate limiting on `/api/auth/login` and `/api/invites/accept/*` (e.g. at the reverse proxy) to slow down guessing.
