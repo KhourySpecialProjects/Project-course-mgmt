@@ -23,7 +23,7 @@ def test_user_can_set_and_remove_own_token(
     login("instructor@example.com")
 
     mine = _by_key(client.get("/api/credentials/me").json())
-    assert set(mine) == {"github_token", "linear_api_key"}  # user-scoped only
+    assert set(mine) == {"github_token", "linear_api_key", "coolify_token"}  # user-scoped only
     assert mine["github_token"]["is_set"] is False
 
     r = client.put("/api/credentials/me/github_token", json={"value": f"  {GITHUB_TOKEN}\n"})
@@ -142,4 +142,4 @@ def test_tool_status_follows_user_token(
     client.put("/api/credentials/me/github_token", json={"value": GITHUB_TOKEN})
     assert client.get("/api/tools/github/status").json()["configured"] is True
     tools = {t["id"]: t["configured"] for t in client.get("/api/tools").json()}
-    assert tools == {"github": True, "linear": False}
+    assert tools == {"github": True, "linear": False, "coolify": False}

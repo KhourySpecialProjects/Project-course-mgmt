@@ -11,7 +11,8 @@ from enum import StrEnum
 
 class CredentialScope(StrEnum):
     # Each user saves their own value (e.g. a personal GitHub token, so actions
-    # in GitHub are performed as that person). Managed on the Account page.
+    # in GitHub are performed as that person). Managed on the Account page, or
+    # in System settings for superusers.
     USER = "user"
     # One value for the whole app (e.g. the Anthropic API key the app uses).
     # Managed by superusers in the admin portal.

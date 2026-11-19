@@ -26,7 +26,8 @@ class ToolModule:
     description: str
     router: APIRouter
     # API keys / tokens this module needs. They appear automatically on the
-    # Account page (scope USER) or in the admin portal (scope SYSTEM).
+    # Account page (scope USER) and in System settings (SYSTEM keys, plus a
+    # superuser's own USER keys).
     credentials: list[CredentialSpec] = field(default_factory=list)
 
     def missing_credentials(self, db: Session, user: User) -> list[CredentialSpec]:
@@ -64,6 +65,14 @@ class ToolStatus(BaseModel):
     missing_system_credentials: list[str] = []
 
 
+def _join_labels(specs: list[CredentialSpec]) -> str:
+    """'A', 'A and B', or 'A, B, and C'."""
+    labels = [s.label for s in specs]
+    if len(labels) <= 2:
+        return " and ".join(labels)
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
 def status_for(module: ToolModule, db: Session, user: User) -> ToolStatus:
     """A ready-made status response that any module can return from its /status endpoint."""
     missing = module.missing_credentials(db, user)
@@ -72,16 +81,22 @@ def status_for(module: ToolModule, db: Session, user: User) -> ToolStatus:
 
     user_missing = [s for s in missing if s.scope == CredentialScope.USER]
     system_missing = [s for s in missing if s.scope == CredentialScope.SYSTEM]
-    parts = []
-    if user_missing:
-        names = ", ".join(s.label for s in user_missing)
-        parts.append(f"Add your {names} on your Account page (API keys tab).")
-    if system_missing:
-        names = ", ".join(s.label for s in system_missing)
-        parts.append(f"An administrator needs to add the {names} in System settings.")
+    if user.is_superuser:
+        # Superusers manage every key, their own and the shared ones, in System settings.
+        message = f"Add the {_join_labels(missing)} in System settings."
+    else:
+        parts = []
+        if user_missing:
+            parts.append(
+                f"Add your {_join_labels(user_missing)} on your Account page (API keys tab)."
+            )
+        if system_missing:
+            names = _join_labels(system_missing)
+            parts.append(f"An administrator needs to add the {names} in System settings.")
+        message = " ".join(parts)
     return ToolStatus(
         configured=False,
-        message=" ".join(parts),
+        message=message,
         missing_user_credentials=[s.key for s in user_missing],
         missing_system_credentials=[s.key for s in system_missing],
     )

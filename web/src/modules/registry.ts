@@ -7,7 +7,7 @@
 //      (api/app/modules/<id>/module.py).
 // See docs/adding-a-tool-module.md for the full walkthrough.
 
-import { IconBrandGithub, IconLayoutKanban, type Icon } from "@tabler/icons-react";
+import { IconBrandGithub, IconLayoutKanban, IconRocket, type Icon } from "@tabler/icons-react";
 
 export interface ToolModuleEntry {
   id: string;
@@ -19,4 +19,5 @@ export interface ToolModuleEntry {
 export const toolModules: ToolModuleEntry[] = [
   { id: "github", name: "GitHub", href: "/tools/github", icon: IconBrandGithub },
   { id: "linear", name: "Linear", href: "/tools/linear", icon: IconLayoutKanban },
+  { id: "coolify", name: "Coolify", href: "/tools/coolify", icon: IconRocket },
 ];

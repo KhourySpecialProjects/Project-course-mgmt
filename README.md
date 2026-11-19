@@ -76,6 +76,13 @@ Setting up a practicum course means doing the same tasks over and over: creating
 - Create projects, starting issues, and workflow states from course templates.
 - Monitor progress across teams: activity, issue throughput, and stalled projects.
 
+### Coolify
+
+- Create one Coolify project per team, with standard environments.
+- Deploy each team's app from its GitHub repo.
+- Set environment variables in bulk from a course template.
+- See every team's deployments at a glance: status, last deploy, and live URL.
+
 ### Future tools
 
 New tools plug into the workbench without changes to the core. Possible additions: Slack or Discord channel setup, grading or peer-evaluation exports, and LMS roster import.
@@ -101,10 +108,11 @@ The skeleton is in place:
 - [x] Superuser created automatically from environment variables
 - [x] User management for superusers, with one-time invite links for new users
 - [x] Encrypted API key storage: personal keys per user, system-wide keys for admins
-- [x] Tool-module registry with placeholder GitHub and Linear modules
+- [x] Tool-module registry with placeholder GitHub, Linear, and Coolify modules
 - [x] Automated tests, linting, type-checking, and CI
 - [ ] Course model (courses, students, teams, projects)
 - [ ] Roster CSV import
 - [ ] GitHub tools
 - [ ] Linear tools
+- [ ] Coolify tools
 - [ ] Background job runner with dry-run preview

@@ -5,18 +5,20 @@
 //   API keys  - your personal tokens for tools like GitHub and Linear.
 //
 // The tab is kept in the URL (/account?tab=api-keys) so other pages can link
-// straight to it.
+// straight to it. Superusers don't get the API keys tab: all of their keys are
+// in System settings, and links to the tab take them there.
 
 import { Button, Card, Group, PasswordInput, Stack, Tabs, Text, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { IconKey, IconUser } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
 import { CredentialList } from "@/components/CredentialList";
 import { api } from "@/lib/api";
+import { apiKeysPath } from "@/lib/paths";
 
 const MIN_PASSWORD_LENGTH = 8; // matches api/app/core/security.py
 
@@ -30,10 +32,17 @@ export default function AccountPage() {
 }
 
 function AccountTabs() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const tab = searchParams.get("tab") === "api-keys" ? "api-keys" : "profile";
+  const showKeysTab = !user?.is_superuser;
+  const wantsKeys = searchParams.get("tab") === "api-keys";
+  const tab = wantsKeys && showKeysTab ? "api-keys" : "profile";
+
+  useEffect(() => {
+    if (wantsKeys && !showKeysTab) router.replace(apiKeysPath(user));
+  }, [wantsKeys, showKeysTab, user, router]);
 
   return (
     <Stack gap="lg" maw={760}>
@@ -46,23 +55,28 @@ function AccountTabs() {
           <Tabs.Tab value="profile" leftSection={<IconUser size={16} />}>
             Profile
           </Tabs.Tab>
-          <Tabs.Tab value="api-keys" leftSection={<IconKey size={16} />}>
-            API keys
-          </Tabs.Tab>
+          {showKeysTab && (
+            <Tabs.Tab value="api-keys" leftSection={<IconKey size={16} />}>
+              API keys
+            </Tabs.Tab>
+          )}
         </Tabs.List>
 
         <Tabs.Panel value="profile" pt="md">
           <ProfileTab />
         </Tabs.Panel>
-        <Tabs.Panel value="api-keys" pt="md">
-          <Stack>
-            <Text size="sm" c="dimmed">
-              Your personal tokens. Tools use them to act on your behalf, so actions in GitHub and
-              Linear show up as yours. Only you can use them; administrators can&apos;t see them.
-            </Text>
-            <CredentialList endpoint="/credentials/me" />
-          </Stack>
-        </Tabs.Panel>
+        {showKeysTab && (
+          <Tabs.Panel value="api-keys" pt="md">
+            <Stack>
+              <Text size="sm" c="dimmed">
+                Your personal tokens. Tools use them to act on your behalf, so actions in GitHub,
+                Linear, and Coolify show up as yours. Only you can use them; administrators
+                can&apos;t see them.
+              </Text>
+              <CredentialList endpoint="/credentials/me" />
+            </Stack>
+          </Tabs.Panel>
+        )}
       </Tabs>
     </Stack>
   );

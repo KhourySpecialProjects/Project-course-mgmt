@@ -1,9 +1,9 @@
 "use client";
 
 // A list of API keys / tokens with "Add", "Replace", and "Remove" actions.
-// Used on the Account page (personal keys) and in System settings (system-wide
-// keys). Saved values are never shown; the API only tells us whether a key is
-// set and its last 4 characters.
+// Used on the Account page (personal keys) and in System settings (a
+// superuser's personal keys plus the shared ones). Saved values are never
+// shown; the API only tells us whether a key is set and its last 4 characters.
 
 import {
   Alert,

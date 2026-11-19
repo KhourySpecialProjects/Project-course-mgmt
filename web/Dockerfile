@@ -16,9 +16,10 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
 EXPOSE 3000
-# Uses webpack with file polling (see the "dev:docker" script and
-# WATCHPACK_POLLING in docker-compose.yml): it reliably notices file changes
-# made on your computer, which Turbopack's watcher can miss inside a container.
+# Uses Turbopack (the Next.js default; much faster than webpack here) with
+# file polling (WATCH_POLL_INTERVAL_MS in docker-compose.yml, read by
+# next.config.ts): edits made on your computer don't send change events into
+# the container, so the dev server checks for them every second instead.
 CMD ["npm", "run", "dev:docker"]
 
 # ---------------------------------------------------------------- build

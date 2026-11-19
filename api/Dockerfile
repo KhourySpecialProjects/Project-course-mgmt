@@ -22,7 +22,9 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-install-project
 COPY . .
 EXPOSE 8000
-CMD ["./scripts/start.sh", "--reload"]
+# Only watch app/ so editing tests or docs doesn't restart the server (a
+# restart drops any request in flight, which shows up as errors in the UI).
+CMD ["./scripts/start.sh", "--reload", "--reload-dir", "app"]
 
 # ---------------------------------------------------------------- prod
 FROM base AS prod

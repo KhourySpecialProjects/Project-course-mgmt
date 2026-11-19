@@ -65,7 +65,7 @@ module = ToolModule(
 )
 ```
 
-The `credentials` list declares which API keys the module needs. Each one automatically appears in the UI for people to fill in: in **System settings** for `SYSTEM` scope, or on each user's **Account → API keys** tab for `USER` scope. See [API keys and tokens](api-keys.md) for choosing a scope.
+The `credentials` list declares which API keys the module needs. Each one automatically appears in the UI for people to fill in: in **System settings** for `SYSTEM` scope, or on each user's **Account → API keys** tab for `USER` scope (superusers see their `USER` keys in System settings too). See [API keys and tokens](api-keys.md) for choosing a scope.
 
 Register it in [`api/app/modules/__init__.py`](../api/app/modules/__init__.py):
 
