@@ -14,6 +14,7 @@ import {
   ScrollArea,
   Text,
   Title,
+  Tooltip,
   UnstyledButton,
   useComputedColorScheme,
   useMantineColorScheme,
@@ -34,6 +35,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import classes from "@/components/AppLayout.module.css";
 import { useAuth } from "@/components/AuthProvider";
 import { apiKeysPath } from "@/lib/paths";
 import { toolModules } from "@/modules/registry";
@@ -68,13 +70,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Group h="100%" px="md" justify="space-between">
           <Group gap="sm">
             <Burger opened={mobileOpen} onClick={toggle} hiddenFrom="sm" size="sm" />
-            {/* The app name doubles as a link back to the dashboard. */}
-            <UnstyledButton component={Link} href="/" onClick={close}>
-              <Group gap="sm" wrap="nowrap">
-                <IconSchool size={26} stroke={1.5} />
-                <Title order={4}>Course Workbench</Title>
-              </Group>
-            </UnstyledButton>
+            {/* The app name doubles as a button back to the dashboard. */}
+            <Tooltip label="Go to dashboard" openDelay={300}>
+              <UnstyledButton component={Link} href="/" onClick={close} className={classes.home}>
+                <Group gap="sm" wrap="nowrap">
+                  <IconSchool size={26} stroke={1.5} />
+                  <Title order={4}>Course Workbench</Title>
+                </Group>
+              </UnstyledButton>
+            </Tooltip>
           </Group>
 
           <Group gap="xs">

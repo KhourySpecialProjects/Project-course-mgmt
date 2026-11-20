@@ -7,7 +7,14 @@
 //      (api/app/modules/<id>/module.py).
 // See docs/adding-a-tool-module.md for the full walkthrough.
 
-import { IconBrandGithub, IconLayoutKanban, IconRocket, type Icon } from "@tabler/icons-react";
+import {
+  IconBrandGithub,
+  IconLayoutKanban,
+  IconLink,
+  IconRocket,
+  type Icon,
+} from "@tabler/icons-react";
+import { type ComponentProps, createElement } from "react";
 
 export interface ToolModuleEntry {
   id: string;
@@ -21,3 +28,11 @@ export const toolModules: ToolModuleEntry[] = [
   { id: "linear", name: "Linear", href: "/tools/linear", icon: IconLayoutKanban },
   { id: "coolify", name: "Coolify", href: "/tools/coolify", icon: IconRocket },
 ];
+
+/**
+ * A tool module's icon, by module id (a plain link icon for anything else).
+ * Used on team cards: <ToolIcon toolId="github" size={14} />
+ */
+export function ToolIcon({ toolId, ...props }: { toolId: string | null } & ComponentProps<Icon>) {
+  return createElement(toolModules.find((m) => m.id === toolId)?.icon ?? IconLink, props);
+}

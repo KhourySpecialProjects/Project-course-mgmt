@@ -1,27 +1,39 @@
 """Coolify tool module.
 
-This is a placeholder that shows the shape of a module. The real work
-(projects per team, deploying team repos, environment variables, deployment
-status) will be added here.
+The course runs one Coolify dashboard (an administrator sets its address in
+System settings). Each student team is its own Team in Coolify, with its own
+DigitalOcean droplet added as that team's server.
 
-Coolify is self-hosted, so the module needs two things: the address of the
-course's Coolify server (one per app, set by an administrator) and each
-user's own API token. Get them inside an endpoint with:
+With your DigitalOcean API token, the workbench finds each team's droplet (named
+or tagged after the team, e.g. ``BeforeDawn``) and links the team to Coolify,
+noting which server is theirs (see ``team_service`` below).
+
+Coolify can't open a particular team from a link: which team you're looking at
+is chosen in Coolify's own team menu, and a link to a server page only works when
+that server's team is already the current one. So the link goes to the dashboard.
+Deploying team repos, environment variables, and deployment status will be added here.
+
+Get the settings inside an endpoint with:
 
     from app.credentials.service import get_system_credential, get_user_credential
-    base_url = get_system_credential(db, "coolify_url")      # e.g. https://coolify.example.edu
-    token = get_user_credential(db, user, "coolify_token")
-
-API calls go to ``f"{base_url.rstrip('/')}/api/v1/..."`` with the header
-``Authorization: Bearer <token>``.
+    dashboard = get_system_credential(db, "coolify_url")
+    token = get_user_credential(db, user, "digitalocean_token")
 """
 
+from urllib.parse import urlsplit
+
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_user
 from app.core.db import DbSession
+from app.core.http import ExternalServiceError
+from app.core.naming import best_match
+from app.credentials.service import get_system_credential, get_user_credential
 from app.credentials.spec import CredentialScope, CredentialSpec
-from app.modules.base import ToolModule, ToolStatus, status_for
+from app.modules.base import CreatedResource, TeamService, ToolModule, ToolStatus, status_for
+from app.modules.coolify import digitalocean
+from app.users.models import User
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
@@ -32,6 +44,32 @@ def status(user: CurrentUser, db: DbSession) -> ToolStatus:
     return status_for(module, db, user)
 
 
+def dashboard_url(saved: str) -> str:
+    """Tidy the saved dashboard address: "coolify.example.edu/" -> "https://coolify.example.edu"."""
+    url = saved.strip().rstrip("/")
+    if not urlsplit(url).scheme:
+        url = f"https://{url}"
+    return url
+
+
+def find_team_server(db: Session, user: User, team_name: str) -> CreatedResource | None:
+    """The team's droplet, linked to the Coolify dashboard; None if no droplet matches."""
+    dashboard = get_system_credential(db, "coolify_url")
+    token = get_user_credential(db, user, "digitalocean_token")
+    if dashboard is None or token is None:
+        raise ExternalServiceError("Coolify isn't set up yet.")
+    droplets = digitalocean.list_droplets(token)
+    droplet = best_match(team_name, droplets, names=lambda d: [d.name, *d.tags])
+    if droplet is None:
+        return None
+    return CreatedResource(
+        url=dashboard_url(dashboard),
+        external_id=droplet.id,
+        label=f"{droplet.name} · {droplet.ip or 'no IP address yet'}",
+        already_existed=True,
+    )
+
+
 module = ToolModule(
     id="coolify",
     name="Coolify",
@@ -40,25 +78,33 @@ module = ToolModule(
     credentials=[
         CredentialSpec(
             key="coolify_url",
-            label="Coolify server URL",
+            label="Coolify dashboard address",
             description=(
-                "The address of the course's Coolify server, shared by everyone, e.g. "
-                "https://coolify.example.edu. Use https://app.coolify.io for Coolify Cloud."
+                "The address of the course's Coolify dashboard, the page you log in to, "
+                "e.g. https://coolify.example.edu. Shared by everyone."
             ),
             scope=CredentialScope.SYSTEM,
             placeholder="https://coolify.example.edu",
         ),
         CredentialSpec(
-            key="coolify_token",
-            label="Coolify API token",
+            key="digitalocean_token",
+            label="DigitalOcean API token",
             description=(
-                "Lets the workbench act in Coolify as you: creating projects and apps and "
-                "deploying them for your team. Create one in Coolify under Keys & Tokens; "
-                "API access must be enabled on the server."
+                "Finds each team's DigitalOcean droplet, the server its Coolify team deploys "
+                "to. Only reads droplets; a token with just the droplet:read scope is enough."
             ),
             scope=CredentialScope.USER,
-            help_url="https://coolify.io/docs/api-reference/authorization",
-            placeholder="1|...",
+            help_url="https://cloud.digitalocean.com/account/api/tokens",
+            placeholder="dop_v1_...",
         ),
     ],
+    team_service=TeamService(
+        resource_name="server",
+        summary=(
+            "Finds the team's DigitalOcean droplet (named or tagged after the team, e.g. "
+            "BeforeDawn) and links Coolify, noting which server is theirs. In Coolify, pick "
+            "the team in the team menu. Droplets are never created or changed."
+        ),
+        find=find_team_server,
+    ),
 )

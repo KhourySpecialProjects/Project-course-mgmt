@@ -165,6 +165,69 @@ Guidelines:
 - **Test without the network.** In tests, replace the client with a fake (e.g. using pytest's `monkeypatch`) so tests are fast and don't need real credentials.
 - **Long operations belong in the job runner** (planned). Until it exists, keep each request short.
 
+## Step 5 (optional): A button on every team card
+
+If the module can make something per team (a repo, a channel, a project), give it a `team_service`. Every card in the dashboard's [Teams](teams.md) section then gets a button for it: dashed until the team has one, and clicking it calls your `create` function. Afterwards the button opens the link it returned.
+
+```python
+from sqlalchemy.orm import Session
+
+from app.core.http import ExternalServiceError
+from app.credentials.service import get_system_credential
+from app.modules.base import CreatedResource, TeamService
+from app.modules.slack import client
+from app.teams.models import Team
+from app.users.models import User
+
+
+def _token(db: Session) -> str:
+    token = get_system_credential(db, "slack_bot_token")
+    if token is None:
+        raise ExternalServiceError("Slack isn't set up yet.")
+    return token
+
+
+def _resource(channel: client.Channel, *, existed: bool) -> CreatedResource:
+    return CreatedResource(
+        url=channel.url,           # where the button goes
+        external_id=channel.id,    # stable id, so one channel can't be linked to two teams
+        label=f"#{channel.name}",  # for "Created the Slack channel #team-alpha."
+        already_existed=existed,
+    )
+
+
+def find_team_channel(db: Session, user: User, team_name: str) -> CreatedResource | None:
+    channel = client.find_channel(_token(db), team_name)  # your client.py; use names_match
+    return _resource(channel, existed=True) if channel else None
+
+
+def create_team_channel(db: Session, user: User, team: Team) -> CreatedResource:
+    found = find_team_channel(db, user, team.name)
+    if found is not None:
+        return found
+    return _resource(client.create_channel(_token(db), team.name), existed=False)
+
+
+module = ToolModule(
+    id="slack",
+    ...,
+    team_service=TeamService(
+        resource_name="channel",
+        summary="Creates a public channel named after the team. An existing one is linked instead.",
+        create=create_team_channel,
+        find=find_team_channel,
+    ),
+)
+```
+
+- `find` lets the **Add team** form fill in the team's link as the name is typed, and powers a card's **Find links**. It must never create anything. Pick the match with `app.core.naming.best_match`, so *Before Dawn* also finds `before-dawn` or `BeforeDawnArchitecturePatterns`, and two equally good candidates link neither.
+- Provide `find`, `create`, or both. Leave `create` out for things the workbench should only find, never make (the Coolify module only finds each team's droplet, since servers cost money).
+- `create` and `find` only run once every credential in the module's `credentials` list is saved; otherwise the form and the dialog tell the user what to add.
+- Raise `ExternalServiceError` with a helpful message when the outside service refuses. It's shown to the user as-is, so never put a token in it.
+- **Find before you create.** Look for an existing one with the team's name and return it with `already_existed=True`. Users will click after setting things up by hand.
+- Make HTTP calls with `app.core.http.request_json` in your `client.py`. Tests replace it with a fake; see the `fake_http` fixture in `tests/test_teams.py`.
+- The button's icon is the module's icon from `web/src/modules/registry.ts`. No other web changes are needed.
+
 ## Checklist
 
 - [ ] `api/app/modules/<id>/module.py` exports `module`
@@ -174,4 +237,5 @@ Guidelines:
 - [ ] UI in `web/src/modules/<id>/`
 - [ ] Page in `web/src/app/(app)/tools/<id>/page.tsx`
 - [ ] Entry in `web/src/modules/registry.ts` with the same `id` as the API module
+- [ ] Optional: `team_service` for a button on every team card
 - [ ] `make check` passes

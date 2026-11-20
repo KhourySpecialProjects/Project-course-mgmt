@@ -6,6 +6,7 @@ modules (see ``app/modules/__init__.py``) and mounts each one's router at
 ``/api/tools/<id>``.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from fastapi import APIRouter
@@ -14,7 +15,50 @@ from sqlalchemy.orm import Session
 
 from app.credentials.service import get_system_credential, get_user_credential
 from app.credentials.spec import CredentialScope, CredentialSpec
+from app.teams.models import Team
 from app.users.models import User
+
+
+@dataclass(frozen=True)
+class CreatedResource:
+    """What a ``TeamService.create`` function returns: the thing it made (or found) for a team."""
+
+    # Where the button on the team's card should go, e.g. the repo's page on GitHub.
+    url: str
+    # The thing's stable id in the outside service, e.g. a GitHub repo id.
+    external_id: str
+    # Human-readable name for messages, e.g. "my-org/team-alpha".
+    label: str
+    # True if it already existed (e.g. a repo with the team's name) and was linked, not created.
+    already_existed: bool = False
+
+
+@dataclass(frozen=True)
+class TeamService:
+    """Lets a tool module create something for each team, shown as a button on the team's card.
+
+    Set ``ToolModule(team_service=TeamService(...))`` and every team card on the
+    dashboard gets a button for the module. Clicking it when the team has no link
+    yet calls ``create``; afterwards the button opens the link.
+    """
+
+    # What it links to, in lower case: "repository", "team", "server".
+    resource_name: str
+    # One or two sentences shown before creating/finding, e.g. what it will be called.
+    summary: str
+    # Makes (or finds) the thing for the team. Runs only once the module is configured
+    # for the user. Raise ``app.core.http.ExternalServiceError`` with a helpful
+    # message if the outside service refuses. Leave out for things the workbench
+    # should only find, never make (e.g. servers, which cost money).
+    create: Callable[[Session, User, Team], CreatedResource] | None = None
+    # Look for an existing one for a team called <name>, without creating anything;
+    # None if there isn't one. Fills in the "Add team" form as the name is typed, and
+    # powers a card's "Find links". Same rules as ``create`` for errors.
+    find: Callable[[Session, User, str], CreatedResource | None] | None = None
+
+    def __post_init__(self) -> None:
+        if self.create is None and self.find is None:
+            raise ValueError("A TeamService needs a create function, a find function, or both")
 
 
 @dataclass(frozen=True)
@@ -29,6 +73,8 @@ class ToolModule:
     # Account page (scope USER) and in System settings (SYSTEM keys, plus a
     # superuser's own USER keys).
     credentials: list[CredentialSpec] = field(default_factory=list)
+    # Optional: a button on each team's card that creates the team's repo/project/...
+    team_service: TeamService | None = None
 
     def missing_credentials(self, db: Session, user: User) -> list[CredentialSpec]:
         """The credentials still needed before ``user`` can use this module."""

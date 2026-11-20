@@ -6,8 +6,8 @@ The workbench talks to outside services (GitHub, Linear, Anthropic, …), and ea
 
 | Scope | Who manages it | Where in the app | Example | Why this scope |
 | ----- | -------------- | ---------------- | ------- | -------------- |
-| **Personal** (`user`) | Each user, for themselves | Account → **API keys** tab. Superusers: Admin → **System settings**, under *Your API keys* | GitHub personal access token, Linear personal API key, Coolify API token | Actions in GitHub/Linear/Coolify happen *as that person*, with their permissions, and show up under their name. |
-| **System-wide** (`system`) | Superusers | Admin → **System settings**, under *Shared API keys* | Anthropic API key, Coolify server URL | One value the app itself uses, shared by every user. |
+| **Personal** (`user`) | Each user, for themselves | Account → **API keys** tab. Superusers: Admin → **System settings**, under *Your API keys* | GitHub personal access token, Linear personal API key, DigitalOcean API token | Actions in GitHub/Linear/DigitalOcean happen *as that person*, with their permissions, and show up under their name. |
+| **System-wide** (`system`) | Superusers | Admin → **System settings**, under *Shared API keys* | Anthropic API key, Coolify dashboard address, GitHub organization | One value the app itself uses, shared by every user. |
 
 User menu → *API keys* goes to the right place for whoever is signed in. Superusers see every key they can manage on one page, System settings, and don't get an API keys tab on their Account page.
 

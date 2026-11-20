@@ -1,6 +1,7 @@
 "use client";
 
-// Dashboard: the first page after logging in.
+// Dashboard: the first page after logging in. Tool cards on top, then the
+// student teams (see components/teams/TeamsSection.tsx).
 
 import {
   Badge,
@@ -17,6 +18,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
+import { TeamsSection } from "@/components/teams/TeamsSection";
 import { api } from "@/lib/api";
 import type { ToolInfo } from "@/lib/types";
 import { toolModules } from "@/modules/registry";
@@ -72,6 +74,8 @@ export default function DashboardPage() {
               );
             })}
       </SimpleGrid>
+
+      <TeamsSection />
     </Stack>
   );
 }

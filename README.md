@@ -52,6 +52,7 @@ Each tier runs in its own Docker container, wired together by [`docker-compose.y
 | [Authentication](docs/authentication.md) | You're working on login, invitations, users, permissions, or the superuser. |
 | [API keys and tokens](docs/api-keys.md) | You need a key for GitHub, Linear, Anthropic, etc., or are adding one. |
 | [Database & migrations](docs/database-and-migrations.md) | You're adding or changing a table. |
+| [Teams](docs/teams.md) | You're using or changing the dashboard's team cards and the repos/projects they create. |
 | [Adding a tool module](docs/adding-a-tool-module.md) | You're building a new integration (or the real GitHub/Linear tools). |
 | [Troubleshooting](docs/troubleshooting.md) | Something isn't working. |
 | [Glossary](docs/glossary.md) | You hit a term you don't recognize. |

@@ -125,14 +125,14 @@ The README describes a **core shell** plus pluggable **tool modules**. The skele
 - **API side:** each module lives in `api/app/modules/<id>/module.py` and exports a `ToolModule` (id, name, description, router, and the API keys it needs). [`api/app/modules/__init__.py`](../api/app/modules/__init__.py) lists the installed modules. `main.py` mounts each module's router at `/api/tools/<id>/…`, and `GET /api/tools` lists them for the dashboard.
 - **Web side:** each module's UI lives in `web/src/modules/<id>/`, its page in `web/src/app/(app)/tools/<id>/page.tsx`, and an entry in [`web/src/modules/registry.ts`](../web/src/modules/registry.ts) adds it to the sidebar and dashboard.
 
-GitHub, Linear, and Coolify are placeholders that only report whether the keys they need have been saved (see [API keys and tokens](api-keys.md)). Coolify needs two: a server URL that an administrator sets once, and each user's own API token. [Adding a tool module](adding-a-tool-module.md) walks through building one.
+GitHub, Linear, and Coolify report whether the keys they need have been saved (see [API keys and tokens](api-keys.md)). GitHub and Coolify each need one shared value that an administrator sets once (the GitHub organization, the Coolify dashboard address) plus each user's own token (for Coolify, a DigitalOcean token that finds each team's droplet). Each of the three also has a `team_service`, which puts a button on every team card on the dashboard that finds, or for GitHub and Linear creates, the team's repo, Linear team, or Coolify server (see [Teams](teams.md)). Their calls to the outside APIs live in `client.py` files in each module (`digitalocean.py` for Coolify). [Adding a tool module](adding-a-tool-module.md) walks through building one.
 
 ### Planned pieces not yet built
 
 These are described in the README and will slot into the existing structure:
 
-- **Course model** (`api/app/courses/`): courses, students, teams, projects. Tool modules read and write it.
-- **Integration adapters** (`api/app/modules/<id>/client.py`): thin wrappers around the GitHub/Linear APIs that handle tokens, rate limits, and retries.
+- **Course model** (`api/app/courses/`): courses, students, projects. Tool modules read and write it. Teams exist already ([`api/app/teams/`](../api/app/teams/)) but don't belong to a course or list their students yet.
+- **Integration adapters** (`api/app/modules/<id>/client.py`): the first ones exist (finding and creating a team's repo and Linear team, finding its droplet); rate limits and retries are still to come.
 - **Job runner**: background execution of bulk operations with progress, logs, and a dry-run preview. A `jobs` table plus a worker process (a fourth container) is the likely shape.
 
 ## Configuration

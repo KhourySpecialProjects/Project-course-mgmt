@@ -15,6 +15,7 @@ from app.invites.router import admin_router as invites_admin_router
 from app.invites.router import public_router as invites_public_router
 from app.modules import MODULES
 from app.modules.base import ToolInfo
+from app.teams.router import router as teams_router
 from app.users.router import router as users_router
 
 app = FastAPI(
@@ -54,6 +55,7 @@ api.include_router(users_router)
 api.include_router(invites_admin_router)
 api.include_router(invites_public_router)
 api.include_router(credentials_router)
+api.include_router(teams_router)
 for module in MODULES:
     api.include_router(module.router, prefix=f"/tools/{module.id}", tags=[module.id])
 

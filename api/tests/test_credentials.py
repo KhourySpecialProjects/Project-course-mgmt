@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.credentials.models import Credential
-from app.credentials.service import get_system_credential, get_user_credential
+from app.credentials.service import get_system_credential, get_user_credential, save
 from app.main import app
 from app.users.models import User
 
@@ -23,7 +23,7 @@ def test_user_can_set_and_remove_own_token(
     login("instructor@example.com")
 
     mine = _by_key(client.get("/api/credentials/me").json())
-    assert set(mine) == {"github_token", "linear_api_key", "coolify_token"}  # user-scoped only
+    assert set(mine) == {"github_token", "linear_api_key", "digitalocean_token"}  # user only
     assert mine["github_token"]["is_set"] is False
 
     r = client.put("/api/credentials/me/github_token", json={"value": f"  {GITHUB_TOKEN}\n"})
@@ -130,16 +130,22 @@ def test_undecryptable_value_is_reported(
 
 
 def test_tool_status_follows_user_token(
-    client: TestClient, make_user: Callable[..., User], login: Callable[[str], None]
+    client: TestClient, db: Session, make_user: Callable[..., User], login: Callable[[str], None]
 ) -> None:
-    make_user("u@example.com")
+    user = make_user("u@example.com")
     login("u@example.com")
 
     status = client.get("/api/tools/github/status").json()
     assert status["configured"] is False
     assert status["missing_user_credentials"] == ["github_token"]
+    assert status["missing_system_credentials"] == ["github_org"]
 
     client.put("/api/credentials/me/github_token", json={"value": GITHUB_TOKEN})
+    status = client.get("/api/tools/github/status").json()
+    assert status["missing_user_credentials"] == []
+    assert status["configured"] is False  # an administrator still has to set the org
+
+    save(db, user_id=None, key="github_org", value="my-course-org", updated_by=user)
     assert client.get("/api/tools/github/status").json()["configured"] is True
     tools = {t["id"]: t["configured"] for t in client.get("/api/tools").json()}
     assert tools == {"github": True, "linear": False, "coolify": False}
