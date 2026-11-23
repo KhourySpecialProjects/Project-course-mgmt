@@ -1,6 +1,7 @@
 """Teams, their links, and creating their repo / Linear team / Coolify project.
 
-Outside services are never called: ``fake_http`` replaces ``app.core.http.request_json``.
+Outside services are never called: the ``fake_http`` fixture (conftest.py) replaces
+``app.core.http.request_json``.
 """
 
 from collections.abc import Callable
@@ -12,55 +13,7 @@ from fastapi.testclient import TestClient
 from app.core import http
 from app.core.naming import best_match
 from app.users.models import User
-
-
-class FakeHttp:
-    """Stands in for ``http.request_json``. Register a response per (method, url).
-
-    A response can be a value to return, an ``HttpError`` to raise, or a function
-    of the request body (for GraphQL, where every request goes to one URL).
-    """
-
-    def __init__(self) -> None:
-        self.routes: dict[tuple[str, str], Any] = {}
-        self.calls: list[tuple[str, str, Any, dict[str, str]]] = []
-
-    def on(self, method: str, url: str, response: Any) -> None:
-        self.routes[(method, url)] = response
-
-    def __call__(
-        self,
-        method: str,
-        url: str,
-        *,
-        headers: dict[str, str] | None = None,
-        body: Any = None,
-        timeout: float = 0,
-    ) -> Any:
-        self.calls.append((method, url, body, headers or {}))
-        if (method, url) not in self.routes:
-            raise AssertionError(f"Unexpected request: {method} {url}")
-        response = self.routes[(method, url)]
-        if isinstance(response, http.HttpError):
-            raise response
-        return response(body) if callable(response) else response
-
-
-@pytest.fixture
-def fake_http(monkeypatch: pytest.MonkeyPatch) -> FakeHttp:
-    fake = FakeHttp()
-    monkeypatch.setattr(http, "request_json", fake)
-    return fake
-
-
-@pytest.fixture
-def staff(
-    client: TestClient, make_user: Callable[..., User], login: Callable[[str], None]
-) -> TestClient:
-    """A logged-in superuser (they can set shared keys too)."""
-    make_user("staff@example.com", is_superuser=True)
-    login("staff@example.com")
-    return client
+from tests.conftest import FakeHttp
 
 
 def _create_team(client: TestClient, name: str) -> dict[str, Any]:

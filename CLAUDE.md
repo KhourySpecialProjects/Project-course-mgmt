@@ -9,6 +9,7 @@ Guidance for AI coding assistants working in this repository. Humans: see README
 - `docker-compose.yml` — `db` (Postgres 17), `api` (:8000), `web` (:3000). The web server rewrites `/api/*` to the API.
 - Tool modules: `api/app/modules/<id>/module.py` + `api/app/modules/__init__.py` registry; `web/src/modules/<id>/` + `web/src/modules/registry.ts`. Outside-API calls go in the module's `client.py` via `app.core.http.request_json` (tests fake it).
 - Teams (dashboard cards): `api/app/teams/` + `web/src/components/teams/`. A module with a `team_service` (see `api/app/modules/base.py`) gets a create button on every team card. See `docs/teams.md`.
+- Coolify panel and Security page: `api/app/modules/coolify/` (`client.py` REST, `ssh.py` server patching/scans over SSH with Coolify's key, `service.py`, background `ServerJob`s) + `web/src/modules/coolify/`. Per-team keys use `CredentialScope.TEAM` (`app/teams/credentials.py`).
 
 ## Commands
 

@@ -10,6 +10,10 @@ POST   /api/teams/{id}/links                        add a link (custom, or an ex
 PATCH  /api/teams/{id}/links/{link_id}              change its label or URL
 DELETE /api/teams/{id}/links/{link_id}              remove it
 
+GET    /api/teams/{id}/credentials                  the team's own API keys (never their values)
+PUT    /api/teams/{id}/credentials/{key}            save one: {"value": "..."}
+DELETE /api/teams/{id}/credentials/{key}            remove one
+
 GET    /api/teams/services                          services that put a button on team cards
 POST   /api/teams/{id}/connect                      link whatever already exists ("Find links")
 POST   /api/teams/{id}/services/{service_id}        create (or find) the team's repo/team/server
@@ -21,10 +25,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import CurrentUser, require_user
 from app.core.db import DbSession
+from app.credentials import registry
+from app.credentials.schemas import CredentialStatus, CredentialUpdate
+from app.credentials.spec import CredentialScope, CredentialSpec
 from app.modules import MODULES
 from app.modules.base import ToolModule, status_for
+from app.teams import credentials as team_credentials
 from app.teams import service
-from app.teams.models import Team
+from app.teams.models import Team, TeamCredential
 from app.teams.schemas import (
     TeamConnected,
     TeamCreate,
@@ -193,3 +201,57 @@ def delete_link(team_id: int, link_id: int, db: DbSession) -> Team:
         return service.delete_link(db, team, service.get_link(team, link_id))
     except TeamError as err:
         _raise(err)
+
+
+# --- Team API keys ----------------------------------------------------------
+
+
+def _team_specs() -> list[CredentialSpec]:
+    return [s for s in registry.specs_for(CredentialScope.TEAM)]
+
+
+def _team_spec(key: str) -> CredentialSpec:
+    spec = next((s for s in _team_specs() if s.key == key), None)
+    if spec is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Unknown team credential: {key}")
+    return spec
+
+
+def _cred_status(spec: CredentialSpec, cred: TeamCredential | None) -> CredentialStatus:
+    return CredentialStatus(
+        key=spec.key,
+        label=spec.label,
+        description=spec.description,
+        scope=spec.scope,
+        help_url=spec.help_url,
+        placeholder=spec.placeholder,
+        is_set=cred is not None,
+        hint=cred.hint if cred else "",
+        readable=team_credentials.is_readable(cred) if cred else True,
+        updated_at=cred.updated_at if cred else None,
+    )
+
+
+@router.get("/{team_id}/credentials", response_model=list[CredentialStatus])
+def list_team_credentials(team_id: int, db: DbSession) -> list[CredentialStatus]:
+    """The team's own API keys (e.g. its Coolify token). Values are never returned."""
+    team = _team(db, team_id)
+    saved = team_credentials.list_saved(db, team.id)
+    return [_cred_status(spec, saved.get(spec.key)) for spec in _team_specs()]
+
+
+@router.put("/{team_id}/credentials/{key}", response_model=CredentialStatus)
+def set_team_credential(
+    team_id: int, key: str, body: CredentialUpdate, user: CurrentUser, db: DbSession
+) -> CredentialStatus:
+    team = _team(db, team_id)
+    spec = _team_spec(key)
+    cred = team_credentials.save(db, team_id=team.id, key=key, value=body.value, updated_by=user)
+    return _cred_status(spec, cred)
+
+
+@router.delete("/{team_id}/credentials/{key}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_team_credential(team_id: int, key: str, db: DbSession) -> None:
+    team = _team(db, team_id)
+    _team_spec(key)
+    team_credentials.delete(db, team_id=team.id, key=key)

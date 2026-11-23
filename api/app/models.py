@@ -8,7 +8,18 @@ from app.auth.models import AuthSession
 from app.core.db import Base
 from app.credentials.models import Credential
 from app.invites.models import Invite
-from app.teams.models import Team, TeamLink
+from app.modules.coolify.models import ServerJob
+from app.teams.models import Team, TeamCredential, TeamLink
 from app.users.models import User
 
-__all__ = ["AuthSession", "Base", "Credential", "Invite", "Team", "TeamLink", "User"]
+__all__ = [
+    "AuthSession",
+    "Base",
+    "Credential",
+    "Invite",
+    "ServerJob",
+    "Team",
+    "TeamCredential",
+    "TeamLink",
+    "User",
+]

@@ -59,3 +59,22 @@ def test_dashboard_address_is_tidied() -> None:
     assert dashboard_url("coolify.example.edu/") == "https://coolify.example.edu"
     assert dashboard_url(" https://coolify.example.edu ") == "https://coolify.example.edu"
     assert dashboard_url("http://203.0.113.5:8000/") == "http://203.0.113.5:8000"
+
+
+def test_status_lists_every_key_the_tool_uses(
+    client: TestClient, make_user: Callable[..., User], login: Callable[[str], None]
+) -> None:
+    make_user("admin@example.com", is_superuser=True)
+    login("admin@example.com")
+    refs = client.get("/api/tools/coolify/status").json()["credentials"]
+    assert [(r["key"], r["scope"], r["required"]) for r in refs] == [
+        ("coolify_url", "system", True),
+        ("digitalocean_token", "user", True),
+        ("coolify_token", "user", False),
+    ]
+    # ...also once everything is set, so the keys can still be changed.
+    client.put("/api/credentials/system/coolify_url", json={"value": "https://coolify.test"})
+    client.put("/api/credentials/me/digitalocean_token", json={"value": "dop_v1_abcdefghijkl"})
+    status = client.get("/api/tools/coolify/status").json()
+    assert status["configured"] is True
+    assert len(status["credentials"]) == 3

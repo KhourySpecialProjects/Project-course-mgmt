@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, Skeleton, Text } from "@mantine/core";
+import { Alert, Anchor, Button, Skeleton, Text } from "@mantine/core";
 import { IconAlertTriangle, IconCircleCheck } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -38,7 +38,10 @@ export function ToolStatusAlert({ toolId }: { toolId: string }) {
 
   return status.configured ? (
     <Alert color="teal" icon={<IconCircleCheck />} title="Configured">
-      {status.message}
+      {status.message}{" "}
+      <Anchor href="#api-keys" size="sm">
+        Change its API keys
+      </Anchor>
     </Alert>
   ) : (
     <Alert color="yellow" icon={<IconAlertTriangle />} title="Not configured yet">

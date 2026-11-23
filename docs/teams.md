@@ -24,9 +24,10 @@ Something already linked to a different team is shown with a warning and not fil
 
 ## The team cards
 
-- **Solid button (↗):** opens the link in a new tab. Hover over it to see what it points to, e.g. `KhourySpecialProjects/BeforeDawnArchitecturePatterns` or `BeforeDawn · 167.99.6.42`.
+- **Solid button (↗):** opens the link in a new tab. Hover over it to see what it points to, e.g. `KhourySpecialProjects/BeforeDawnArchitecturePatterns` or `BeforeDawn · 167.99.6.42`. The **Coolify** button opens the team's [Coolify panel](#the-team-coolify-panel) instead.
 - **Dashed button (+):** the team doesn't have one yet. Click it to create (GitHub, Linear) or find (Coolify) it. The dialog explains what will happen, and you can paste a link to an existing one instead.
 - **⋯ menu:**
+  - *Open Coolify panel*: see below.
   - *Find links* links everything that already exists for the team, in every service, without creating anything. Use it for teams added before their repo/team/server existed.
   - *Rename*, *Add link* (any other service), *Edit links* (change or remove links), and *Delete team*.
 
@@ -48,10 +49,35 @@ The course runs **one Coolify dashboard** (the `coolify-control-plane-droplet`).
 
 The workbench finds a team's droplet in DigitalOcean by its name or a tag, and links the team to the Coolify dashboard. **Coolify can't open a particular team from a link.** The current team is picked in Coolify's own team menu, and a link to a server page only works when that server's team is already the current one. So after clicking the button, switch to the team in Coolify.
 
-Not possible yet:
+Creating the team in Coolify isn't possible from the workbench: Coolify's API has no way to create teams.
 
-- **Creating the team in Coolify.** Coolify's API has no way to create teams.
-- **Opening the team's server page directly.** Coolify's API keys belong to one Coolify team each, so finding each team's server page would need a key from every team. It would also need **API access** turned on in Coolify (*Settings → Advanced → API and MCP*); it's currently off.
+## The team Coolify panel
+
+Each team has a page (`/teams/<id>/coolify`, from the card's Coolify button or *⋯ → Open Coolify panel*) for doing in Coolify what you'd otherwise do there or through Coolify's MCP, without switching teams.
+
+**Connecting a team (automatic).** Coolify API tokens only see their own team, so each team needs its own token, and Coolify's API has no way to create tokens. The workbench makes them itself:
+
+1. Once, for the whole Coolify: turn on **Settings → Advanced → API and MCP → API access**.
+2. Once, for you: add a **Coolify admin token** in your API keys (System settings → *Your API keys*). It must come from your main Coolify team, the one that owns the Coolify server, and have the **root** permission.
+
+After that, every team connects itself: when its Coolify panel opens, when the Security page opens, and right after a team (or its Coolify link) is added. With the admin token, the workbench reads Coolify's SSH key for its own server, logs in to the Coolify server (the dashboard's address, as root), and runs Coolify's own token code (`createToken`, the same as its token page) for the team's Coolify team. The Coolify team is matched by the team's droplet IP, then by name, never the main team. The new token is called **course-workbench**, belongs to an owner or admin of that Coolify team, has **read, read:sensitive, write, and deploy**, and is stored encrypted. Connecting again replaces it.
+
+If a team can't be matched, or you'd rather not use an admin token, paste a token by hand on the team's panel: in Coolify, switch to the team, open **Keys & Tokens → API tokens**, and create one with those four permissions.
+
+**What you can do**
+
+| Area | Actions |
+| ---- | ------- |
+| Apps, databases, services | See status and where each runs (project / environment). **Redeploy** (apps: a fresh build without cache, pulling newer base images; services: pull the latest images), **restart**, **stop**, **start**. |
+| Apps | **Logs** (last 500 lines), **deployments** with each one's log (and cancel a running one), **environment variables** (view, add, change, delete; locked values stay hidden). Redeploy afterwards for changes to take effect. |
+| Security | Each resource's verdict from Coolify's image scans (*Update now*, *Update available*, *No fix yet*, *OK*) with critical/high/medium counts and known-exploited flags, and the full list of findings (package, version, fixed-in version, advisory). *Update now* on an app redeploys it, which is usually what fixes it. Problems in the team's own code or dependencies have to be fixed in their repository. |
+| Servers | **Auto image scans** on/off (Coolify then scans after each deploy and daily). **Check for updates** and **Install security updates** (or all updates) for the server's system packages. **Scan containers now** runs Grype, the scanner Coolify uses, on every running image. **Docker cleanup** frees disk space. |
+
+Server updates and *Scan containers now* aren't available through Coolify's API, so the workbench logs in to the team's server over SSH **with the key Coolify keeps for it**. The key is read through the team's token (which is why that needs read:sensitive) and never stored. These run in the background and the page follows their progress. Only apt-based servers (Ubuntu/Debian) can be updated. If Docker is updated, the team's containers restart briefly. **Servers are never rebooted automatically**; the panel shows when one needs a reboot.
+
+## The Security page
+
+**Tools → Coolify** shows every connected team at once: all deployed apps, most urgent first, with their security verdict and what to do (with **Redeploy** for *Update now* / *Update available*), and every team server with its system-update status (with **Check** and **Install security updates**). Teams without a Coolify token are listed with a link to connect them.
 
 ## How names are matched
 

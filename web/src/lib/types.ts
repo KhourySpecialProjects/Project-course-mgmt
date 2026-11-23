@@ -23,6 +23,8 @@ export interface ToolStatus {
   message: string;
   missing_user_credentials: string[];
   missing_system_credentials: string[];
+  /** Every personal and shared key the tool uses (never their values). */
+  credentials: { key: string; label: string; scope: "user" | "system"; required: boolean }[];
 }
 
 export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
@@ -118,7 +120,7 @@ export interface CredentialStatus {
   key: string;
   label: string;
   description: string;
-  scope: "user" | "system";
+  scope: "user" | "system" | "team";
   help_url: string | null;
   placeholder: string;
   is_set: boolean;
@@ -127,4 +129,172 @@ export interface CredentialStatus {
   /** False when a value is saved but can no longer be decrypted. */
   readable: boolean;
   updated_at: string | null;
+}
+
+// --- Coolify panel (api/app/modules/coolify/schemas.py) -----------------------
+
+export type CoolifyResourceKind = "applications" | "databases" | "services";
+export type CoolifyAction = "start" | "stop" | "restart" | "redeploy";
+export type ServerJobKind = "patch_check" | "patch_security" | "patch_all" | "image_scan";
+
+/** Coolify's image-scan verdict, as its Security tab shows it. */
+export interface SecurityInfo {
+  /** update_now | update_available | no_fix | check_needed | ok | not_checked */
+  status: string;
+  label: string;
+  action: string;
+  problem_count: number;
+  exploited_count: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  eol: boolean | null;
+  checked_at: string | null;
+}
+
+export interface PackageUpdate {
+  package: string;
+  current_version: string;
+  new_version: string;
+  security: boolean;
+}
+
+export interface ImageScan {
+  image: string;
+  error?: string;
+  counts?: Record<string, number>;
+  fixable?: number;
+  findings?: {
+    id: string;
+    severity: string;
+    package: string;
+    version: string;
+    fixed_in: string;
+    url: string;
+  }[];
+}
+
+export interface ServerJob {
+  id: number;
+  kind: ServerJobKind;
+  server_uuid: string;
+  server_name: string;
+  status: "running" | "succeeded" | "failed";
+  log: string;
+  /** Patch jobs: update_count, security_count, reboot_required, updates. Scans: images. */
+  result: {
+    update_count?: number;
+    security_count?: number;
+    reboot_required?: boolean;
+    updates?: PackageUpdate[];
+    images?: ImageScan[];
+  } | null;
+  error: string;
+  started_by: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface CoolifyServer {
+  uuid: string;
+  name: string;
+  ip: string;
+  reachable: boolean | null;
+  usable: boolean | null;
+  image_scanning: boolean | null;
+  last_patch_check: ServerJob | null;
+  last_image_scan: ServerJob | null;
+  running_job: ServerJob | null;
+}
+
+export interface CoolifyResource {
+  kind: CoolifyResourceKind;
+  uuid: string;
+  name: string;
+  /** e.g. "running:healthy", "exited:unhealthy" */
+  status: string;
+  project: string;
+  environment: string;
+  fqdn: string | null;
+  git_repository: string | null;
+  git_branch: string | null;
+  security: SecurityInfo | null;
+}
+
+export interface CoolifyOverview {
+  team_name: string;
+  token_set: boolean;
+  /** The workbench can make this team's token itself (you have a Coolify admin token). */
+  auto_connect: boolean;
+  dashboard_url: string | null;
+  coolify_team: string | null;
+  error: string | null;
+  security_error: string | null;
+  servers: CoolifyServer[];
+  resources: CoolifyResource[];
+}
+
+export interface CoolifyActionResult {
+  message: string;
+  deployment_uuid: string | null;
+}
+
+export interface CoolifyDeployment {
+  uuid: string;
+  status: string;
+  commit: string | null;
+  commit_message: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CoolifyDeploymentDetail extends CoolifyDeployment {
+  log: { output: string; type: string }[];
+}
+
+export interface CoolifyEnv {
+  uuid: string;
+  key: string;
+  /** null when Coolify won't show it (locked, or the token can't read secrets). */
+  value: string | null;
+  is_buildtime: boolean;
+  is_preview: boolean;
+  is_literal: boolean;
+  is_multiline: boolean;
+  is_shown_once: boolean;
+}
+
+export interface CoolifyFinding {
+  id: string;
+  title: string;
+  severity: string;
+  package: string;
+  version: string;
+  fixed_in: string;
+  state: string;
+  kev: boolean;
+  url: string;
+  image: string;
+}
+
+export interface CoolifyFindings {
+  security: SecurityInfo | null;
+  images: string[];
+  findings: CoolifyFinding[];
+  total: number;
+}
+
+export interface TeamSecurity {
+  team_id: number;
+  team_name: string;
+  token_set: boolean;
+  auto_connect: boolean;
+  error: string | null;
+  resources: CoolifyResource[];
+  servers: CoolifyServer[];
+}
+
+export interface CoolifyAutoConnect {
+  coolify_team: string;
+  message: string;
 }

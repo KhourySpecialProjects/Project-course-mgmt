@@ -23,7 +23,7 @@ def test_user_can_set_and_remove_own_token(
     login("instructor@example.com")
 
     mine = _by_key(client.get("/api/credentials/me").json())
-    assert set(mine) == {"github_token", "linear_api_key", "digitalocean_token"}  # user only
+    assert set(mine) == {"github_token", "linear_api_key", "digitalocean_token", "coolify_token"}
     assert mine["github_token"]["is_set"] is False
 
     r = client.put("/api/credentials/me/github_token", json={"value": f"  {GITHUB_TOKEN}\n"})

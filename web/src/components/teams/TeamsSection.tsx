@@ -23,6 +23,7 @@ import { AddTeamDialog } from "@/components/teams/AddTeamDialog";
 import { TeamCard } from "@/components/teams/TeamCard";
 import { api } from "@/lib/api";
 import type { Team, TeamService } from "@/lib/types";
+import { connectCoolifyInBackground } from "@/modules/coolify/parts";
 
 // "Team 2" before "Team 10", ignoring case.
 const byName = (a: Team, b: Team) =>
@@ -58,6 +59,8 @@ export function TeamsSection() {
   function added(team: Team) {
     upsert(team);
     setAdding(false);
+    // Make the team's own Coolify token right away (if you have a Coolify admin token).
+    if (team.links.some((l) => l.service_id === "coolify")) connectCoolifyInBackground(team.id);
   }
 
   return (

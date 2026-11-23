@@ -2,12 +2,15 @@
 
 The workbench talks to outside services (GitHub, Linear, Anthropic, …), and each needs a key or token. Those keys are entered **in the app**, not in `.env`, and stored **encrypted** in the database.
 
-## Two kinds of keys
+## Three kinds of keys
 
 | Scope | Who manages it | Where in the app | Example | Why this scope |
 | ----- | -------------- | ---------------- | ------- | -------------- |
 | **Personal** (`user`) | Each user, for themselves | Account → **API keys** tab. Superusers: Admin → **System settings**, under *Your API keys* | GitHub personal access token, Linear personal API key, DigitalOcean API token | Actions in GitHub/Linear/DigitalOcean happen *as that person*, with their permissions, and show up under their name. |
 | **System-wide** (`system`) | Superusers | Admin → **System settings**, under *Shared API keys* | Anthropic API key, Coolify dashboard address, GitHub organization | One value the app itself uses, shared by every user. |
+| **Team** (`team`) | Any logged-in user | The team's page (e.g. its Coolify panel) | A team's Coolify API token | The outside service only issues keys per team (Coolify tokens see only their own Coolify team). |
+
+Each tool's page (GitHub, Linear, Coolify) also has an **API keys** section with just that tool's keys, to add, replace, or remove them right there, including after the tool says *Configured*.
 
 User menu → *API keys* goes to the right place for whoever is signed in. Superusers see every key they can manage on one page, System settings, and don't get an API keys tab on their Account page.
 

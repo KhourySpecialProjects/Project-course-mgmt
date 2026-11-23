@@ -80,6 +80,8 @@ class ToolModule:
         """The credentials still needed before ``user`` can use this module."""
         missing = []
         for spec in self.credentials:
+            if spec.scope == CredentialScope.TEAM or not spec.required:
+                continue  # set per team (checked where a team is involved), or optional
             if spec.scope == CredentialScope.USER:
                 value = get_user_credential(db, user, spec.key)
             else:
@@ -101,6 +103,15 @@ class ToolInfo(BaseModel):
     configured: bool
 
 
+class CredentialRef(BaseModel):
+    """One API key a module uses (the value itself is never included)."""
+
+    key: str
+    label: str
+    scope: CredentialScope
+    required: bool
+
+
 class ToolStatus(BaseModel):
     """What each module's ``GET /api/tools/<id>/status`` returns."""
 
@@ -109,6 +120,8 @@ class ToolStatus(BaseModel):
     # Keys of credentials still to be added, and where they're managed.
     missing_user_credentials: list[str] = []
     missing_system_credentials: list[str] = []
+    # Every personal and shared key the module uses, so its page can offer to change them.
+    credentials: list[CredentialRef] = []
 
 
 def _join_labels(specs: list[CredentialSpec]) -> str:
@@ -122,8 +135,15 @@ def _join_labels(specs: list[CredentialSpec]) -> str:
 def status_for(module: ToolModule, db: Session, user: User) -> ToolStatus:
     """A ready-made status response that any module can return from its /status endpoint."""
     missing = module.missing_credentials(db, user)
+    refs = [
+        CredentialRef(key=s.key, label=s.label, scope=s.scope, required=s.required)
+        for s in module.credentials
+        if s.scope != CredentialScope.TEAM
+    ]
     if not missing:
-        return ToolStatus(configured=True, message=f"{module.name} is ready to use.")
+        return ToolStatus(
+            configured=True, message=f"{module.name} is ready to use.", credentials=refs
+        )
 
     user_missing = [s for s in missing if s.scope == CredentialScope.USER]
     system_missing = [s for s in missing if s.scope == CredentialScope.SYSTEM]
@@ -145,4 +165,5 @@ def status_for(module: ToolModule, db: Session, user: User) -> ToolStatus:
         message=message,
         missing_user_credentials=[s.key for s in user_missing],
         missing_system_credentials=[s.key for s in system_missing],
+        credentials=refs,
     )

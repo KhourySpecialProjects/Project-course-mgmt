@@ -11,7 +11,7 @@ custom link that someone added by hand.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, TimestampMixin
@@ -61,3 +61,25 @@ class TeamLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     team: Mapped[Team] = relationship(back_populates="links")
+
+
+class TeamCredential(Base):
+    """An encrypted API key that belongs to one team (``CredentialScope.TEAM``).
+
+    Same rules as the ``credentials`` table: values are Fernet-encrypted and never
+    sent back; ``hint`` holds the last 4 characters.
+    """
+
+    __tablename__ = "team_credentials"
+    __table_args__ = (UniqueConstraint("team_id", "key", name="uq_team_credentials_team_id_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
+    key: Mapped[str] = mapped_column(String(100))
+    encrypted_value: Mapped[str] = mapped_column(Text)
+    hint: Mapped[str] = mapped_column(String(8))
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

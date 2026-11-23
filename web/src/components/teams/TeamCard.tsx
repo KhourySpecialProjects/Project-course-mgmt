@@ -22,6 +22,7 @@ import {
   IconSearch,
   IconTrash,
 } from "@tabler/icons-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -34,7 +35,8 @@ import {
 } from "@/components/teams/TeamDialogs";
 import { api } from "@/lib/api";
 import type { Team, TeamConnected, TeamLink, TeamService } from "@/lib/types";
-import { ToolIcon } from "@/modules/registry";
+import { connectCoolifyInBackground } from "@/modules/coolify/parts";
+import { ToolIcon, teamPanelHref } from "@/modules/registry";
 
 type Dialog =
   | { kind: "rename" }
@@ -86,6 +88,9 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
     try {
       const result = await api.post<TeamConnected>(`/teams/${team.id}/connect`);
       onChange(result.team);
+      if (result.results.some((r) => r.service_id === "coolify" && r.outcome === "linked")) {
+        connectCoolifyInBackground(team.id);
+      }
       const name = (serviceId: string) =>
         services.find((s) => s.id === serviceId)?.name ?? serviceId;
       const linked = result.results.filter((r) => r.outcome === "linked");
@@ -144,6 +149,18 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
+            {services
+              .filter((s) => teamPanelHref(s.id, team.id))
+              .map((s) => (
+                <Menu.Item
+                  key={s.id}
+                  component={Link}
+                  href={teamPanelHref(s.id, team.id) ?? "#"}
+                  leftSection={<ToolIcon toolId={s.id} size={14} />}
+                >
+                  Open {s.name} panel
+                </Menu.Item>
+              ))}
             {missingService && (
               <Menu.Item leftSection={<IconSearch size={14} />} onClick={findLinks}>
                 Find links
@@ -187,6 +204,7 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
             key={s.id}
             service={s}
             link={team.links.find((l) => l.service_id === s.id)}
+            panelHref={teamPanelHref(s.id, team.id)}
             onCreate={() => setDialog({ kind: "create", service: s })}
           />
         ))}
@@ -250,13 +268,26 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
 function ServiceButton({
   service,
   link,
+  panelHref,
   onCreate,
 }: {
   service: TeamService;
   link: TeamLink | undefined;
+  /** The team's page for this tool (e.g. its Coolify panel), opened instead of the link. */
+  panelHref: string | null;
   onCreate: () => void;
 }) {
   const icon = <ToolIcon toolId={service.id} size={14} />;
+
+  if (link && panelHref) {
+    return (
+      <Tooltip label={`${link.label} · open the team's ${service.name} panel`} withArrow>
+        <Button component={Link} href={panelHref} size="xs" variant="light" leftSection={icon}>
+          {service.name}
+        </Button>
+      </Tooltip>
+    );
+  }
 
   if (link) {
     return (
