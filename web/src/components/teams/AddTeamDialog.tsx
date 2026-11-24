@@ -17,6 +17,7 @@ import {
   Loader,
   Stack,
   Text,
+  Textarea,
   TextInput,
 } from "@mantine/core";
 import { useDebouncedCallback } from "@mantine/hooks";
@@ -31,7 +32,14 @@ import {
 import { type FormEvent, type ReactNode, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
-import type { ServiceLookup, Team, TeamLookup, TeamService, TeamServiceCreated } from "@/lib/types";
+import type {
+  MembersPasted,
+  ServiceLookup,
+  Team,
+  TeamLookup,
+  TeamService,
+  TeamServiceCreated,
+} from "@/lib/types";
 import { ToolIcon } from "@/modules/registry";
 
 const URL_PATTERN = /^https?:\/\/\S+$/i;
@@ -93,6 +101,7 @@ export function AddTeamDialog({
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [rows, setRows] = useState<Record<string, ServiceRow>>({});
   const [custom, setCustom] = useState<CustomRow[]>([]);
+  const [students, setStudents] = useState("");
   const [progress, setProgress] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   // The name the newest lookup is for, so a slow, older answer is ignored.
@@ -216,8 +225,22 @@ export function AddTeamDialog({
       return;
     }
 
-    // The team exists now. Create the rest one by one; a failure doesn't undo the team.
+    // The team exists now. Add its students and create the rest one by one; a failure
+    // doesn't undo the team.
     const failures: string[] = [];
+    if (students.trim()) {
+      setProgress("Adding students...");
+      try {
+        const pasted = await api.post<MembersPasted>(`/teams/${team.id}/members/paste`, {
+          text: students,
+        });
+        team = pasted.team;
+        if (pasted.skipped.length)
+          failures.push(`Students not added: ${pasted.skipped.join("; ")}.`);
+      } catch (err) {
+        failures.push(`Students: ${errorMessage(err)}`);
+      }
+    }
     for (const s of toCreate) {
       setProgress(`Creating ${s.name} ${s.resource_name}...`);
       try {
@@ -283,6 +306,21 @@ export function AddTeamDialog({
             ))}
           </Stack>
         )}
+
+        <Stack gap="xs">
+          <Divider label="Students (optional)" labelPosition="left" />
+          <Textarea
+            aria-label="Students"
+            autosize
+            minRows={2}
+            ff="monospace"
+            placeholder={
+              "One per line: name, email, GitHub username\nAna Diaz, ana@school.edu, @anadiaz"
+            }
+            value={students}
+            onChange={(e) => setStudents(e.currentTarget.value)}
+          />
+        </Stack>
 
         <Stack gap="xs">
           <Divider label="Other links (optional)" labelPosition="left" />

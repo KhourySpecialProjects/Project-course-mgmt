@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
@@ -27,7 +28,9 @@ from app.modules.coolify.client import CoolifyClient, ResourceKind, dashboard_ur
 from app.modules.coolify.models import ServerJob
 from app.modules.coolify.schemas import (
     ActionResult,
+    AppSummary,
     AutoConnectResult,
+    CourseSummary,
     Deployment,
     DeploymentDetail,
     EnvVar,
@@ -40,7 +43,9 @@ from app.modules.coolify.schemas import (
     ResourceInfo,
     SecurityInfo,
     ServerInfo,
+    ServerSummary,
     TeamSecurity,
+    TeamSummary,
 )
 from app.teams.credentials import get_team_credential
 from app.teams.credentials import save as save_team_credential
@@ -617,3 +622,149 @@ def connect_team(db: Session, team: Team, user: User) -> AutoConnectResult:
         coolify_team=name,
         message=f"Connected {team.name} to its Coolify team, {name}.",
     )
+
+
+def deployed_repos(db: Session, team: Team) -> dict[str, list[str]]:
+    """GitHub repos the team's Coolify apps deploy from: {"owner/name": [branches]}.
+
+    Empty if the team isn't connected to Coolify or Coolify can't be read.
+    """
+    dashboard = get_system_credential(db, "coolify_url")
+    token = get_team_credential(db, team.id, TOKEN_KEY)
+    if dashboard is None or token is None:
+        return {}
+    try:
+        apps = CoolifyClient(dashboard, token).resources("applications")
+    except ExternalServiceError:
+        return {}
+    repos: dict[str, list[str]] = {}
+    for app in apps:
+        repo = github_repo(app.get("git_repository"))
+        if not repo:
+            continue
+        branches = repos.setdefault(repo, [])
+        branch = str(app.get("git_branch") or "")
+        if branch and branch not in branches:
+            branches.append(branch)
+    return repos
+
+
+_GITHUB_REPO = re.compile(
+    r"^(?:https?://github\.com/|git@github\.com:)?([\w.-]+/[\w.-]+?)(?:\.git)?/?$"
+)
+
+
+def github_repo(git_repository: Any) -> str | None:
+    """owner/name from what Coolify stores ("org/x", "https://github.com/org/x.git", ...)."""
+    m = _GITHUB_REPO.match(str(git_repository or "").strip())
+    return m.group(1) if m else None
+
+
+# --- the course summary -----------------------------------------------------------
+#
+# One cheap read of every connected team (apps with status and security, servers),
+# for the dashboard's "Needs attention" list and the status line on each team card.
+# Teams are read in parallel, and the result is kept for a minute.
+
+SUMMARY_TTL_SECONDS = 60
+_summary_cache: dict[str, tuple[float, CourseSummary]] = {}
+
+TeamRead = tuple[
+    dict[ResourceKind, list[dict[str, Any]]], list[dict[str, Any]], dict[str, SecurityInfo | None]
+]
+
+
+def _read_team(dashboard: str, token: str) -> TeamRead:
+    """Everything the summary needs from one team's Coolify. Runs in a worker thread (no DB)."""
+    client = CoolifyClient(dashboard, token)
+    kinds: tuple[ResourceKind, ...] = ("applications", "databases", "services")
+    raw = {kind: client.resources(kind) for kind in kinds}
+    servers = client.servers()
+    try:
+        security = {
+            str(v.get("uuid")): _security(v.get("security")) for v in client.vulnerabilities()
+        }
+    except ExternalServiceError:
+        security = {}
+    return raw, servers, security
+
+
+def _server_summary(db: Session, raw: dict[str, Any], jobs: list[ServerJob]) -> ServerSummary:
+    uuid = str(raw.get("uuid", ""))
+    mine = [j for j in jobs if j.server_uuid == uuid]
+    check = next((j for j in mine if j.kind in PATCH_KINDS and j.status == "succeeded"), None)
+    try:
+        result = json.loads(check.result) if check and check.result else {}
+    except ValueError:
+        result = {}
+    raw_settings = raw.get("settings")
+    settings: dict[str, Any] = raw_settings if isinstance(raw_settings, dict) else {}
+    return ServerSummary(
+        uuid=uuid,
+        name=str(raw.get("name", "")),
+        ip=str(raw.get("ip", "")),
+        reachable=settings.get("is_reachable"),
+        update_count=result.get("update_count"),
+        security_count=result.get("security_count"),
+        reboot_required=result.get("reboot_required"),
+        checked_at=check.finished_at if check else None,
+        job_running=any(job_read(db, j).status == "running" for j in mine),
+    )
+
+
+def course_summary(db: Session, teams: list[Team], *, refresh: bool = False) -> CourseSummary:
+    dashboard = get_system_credential(db, "coolify_url")
+    tokens = {t.id: get_team_credential(db, t.id, TOKEN_KEY) for t in teams}
+    cache_key = json.dumps([[t.id, t.name, bool(tokens[t.id])] for t in teams] + [dashboard])
+    cached = _summary_cache.get(cache_key)
+    if cached and not refresh and time.monotonic() - cached[0] < SUMMARY_TTL_SECONDS:
+        return cached[1]
+
+    results: dict[int, TeamRead | ExternalServiceError] = {}
+    if dashboard is not None:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {
+                t.id: pool.submit(_read_team, dashboard, token)
+                for t in teams
+                if (token := tokens[t.id])
+            }
+            for team_id, future in futures.items():
+                try:
+                    results[team_id] = future.result()
+                except ExternalServiceError as err:
+                    results[team_id] = err
+
+    jobs = list(db.scalars(select(ServerJob).order_by(ServerJob.id.desc())))
+    summaries = []
+    for team in teams:
+        row = TeamSummary(team_id=team.id, team_name=team.name, connected=bool(tokens[team.id]))
+        summaries.append(row)
+        result = results.get(team.id)
+        if result is None:
+            continue
+        if isinstance(result, ExternalServiceError):
+            row.error = str(result)
+            continue
+        raw, raw_servers, security = result
+        for kind, items in raw.items():
+            for item in items:
+                uuid = str(item.get("uuid", ""))
+                row.apps.append(
+                    AppSummary(
+                        kind=kind,
+                        uuid=uuid,
+                        name=str(item.get("name") or uuid),
+                        status=str(item.get("status") or ""),
+                        security=security.get(uuid),
+                    )
+                )
+                repo = github_repo(item.get("git_repository")) if kind == "applications" else None
+                if repo and repo not in row.repos:
+                    row.repos.append(repo)
+        team_jobs = [j for j in jobs if j.team_id == team.id]
+        row.servers = [_server_summary(db, s, team_jobs) for s in raw_servers]
+
+    summary = CourseSummary(teams=summaries, generated_at=datetime.now(UTC))
+    _summary_cache.clear()
+    _summary_cache[cache_key] = (time.monotonic(), summary)
+    return summary

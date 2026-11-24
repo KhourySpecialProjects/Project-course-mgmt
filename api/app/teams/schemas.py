@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Literal, Self
 from urllib.parse import urlsplit
@@ -31,12 +32,106 @@ class TeamLinkRead(BaseModel):
     created_at: datetime
 
 
+class TeamMemberRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    email: str
+    github_username: str
+    role: str
+
+
+_GITHUB_USER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
+_EMAIL = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
+
+
+def clean_github_username(value: str) -> str:
+    """Accept "octocat", "@octocat", or "https://github.com/octocat"."""
+    v = value.strip().removeprefix("@").rstrip("/")
+    if "github.com/" in v:
+        v = v.split("github.com/", 1)[1].split("/", 1)[0]
+    if v and not _GITHUB_USER.match(v):
+        raise ValueError(f"{value!r} isn't a GitHub username")
+    return v
+
+
+class TeamMemberWrite(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(default="", max_length=320)
+    github_username: str = Field(default="", max_length=100)
+    role: str = Field(default="", max_length=100)
+
+    @field_validator("name", "role")
+    @classmethod
+    def _tidy(cls, v: str) -> str:
+        return " ".join(v.split())
+
+    @field_validator("email")
+    @classmethod
+    def _check_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v and not _EMAIL.match(v):
+            raise ValueError(f"{v!r} isn't an email address")
+        return v
+
+    @field_validator("github_username")
+    @classmethod
+    def _check_github(cls, v: str) -> str:
+        return clean_github_username(v)
+
+
+def parse_member_line(line: str) -> TeamMemberWrite | None:
+    """One student from a pasted line: "Ana Diaz, ana@school.edu, @anadiaz, PM".
+
+    Fields are separated by commas, tabs, or semicolons, in the order name, email,
+    GitHub username, role (so a spreadsheet's columns paste straight in). Emails,
+    @usernames, and github.com links are recognized wherever they are; otherwise the
+    first part is the name, the third column is the GitHub username, and anything
+    else is the role. Returns None for a blank line.
+    """
+    # Keep empty columns: "Ana, ana@x.edu, , PM" has no GitHub username but a role.
+    parts = [p.strip() for p in re.split(r"[,\t;]", line)]
+    if not any(parts):
+        return None
+    email = github = ""
+    rest: list[tuple[int, str]] = []  # (column, text) of what's left
+    for column, p in enumerate(parts):
+        if not p:
+            continue
+        if not email and _EMAIL.match(p.lower()):
+            email = p
+        elif not github and (p.startswith("@") or "github.com/" in p):
+            github = p
+        else:
+            rest.append((column, p))
+    name = ""
+    role: list[str] = []
+    for column, p in rest:
+        if not name:
+            name = p
+        elif not github and column == 2 and _GITHUB_USER.match(p):
+            github = p  # the GitHub column, written without an @
+        else:
+            role.append(p)
+    if not name:
+        name = email.split("@")[0] if email else clean_github_username(github)
+    return TeamMemberWrite(name=name, email=email, github_username=github, role=" ".join(role))
+
+
+class TeamMembersPaste(BaseModel):
+    """Several students at once, one per line (see ``parse_member_line``)."""
+
+    text: str = Field(min_length=1, max_length=20000)
+
+
 class TeamRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
     links: list[TeamLinkRead]
+    members: list[TeamMemberRead] = []
     created_at: datetime
 
 
@@ -85,6 +180,7 @@ class TeamCreate(TeamName):
     """A new team, optionally with its links (all of them at once, from the "Add team" form)."""
 
     links: list[TeamLinkCreate] = Field(default=[], max_length=50)
+    members: list[TeamMemberWrite] = Field(default=[], max_length=100)
 
     @model_validator(mode="after")
     def _one_link_per_service(self) -> Self:

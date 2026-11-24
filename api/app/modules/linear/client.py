@@ -101,3 +101,54 @@ def create_team(api_key: str, name: str, url_key: str) -> LinearTeam:
     if not payload.get("success") or not payload.get("team"):
         raise ExternalServiceError("Linear didn't create the team.")
     return _to_team(payload["team"], url_key)
+
+
+_TEAM_ACTIVITY = """
+query WorkbenchTeamActivity($id: String!) {
+  team(id: $id) {
+    name
+    key
+    issues(first: 50, orderBy: updatedAt) {
+      nodes {
+        identifier title url updatedAt completedAt
+        state { name type }
+        assignee { name }
+      }
+    }
+  }
+}
+"""
+
+
+def team_activity(api_key: str, team_id: str) -> dict[str, Any]:
+    """The team's 50 most recently updated issues, and how many are in each kind of state."""
+    data = _graphql(api_key, _TEAM_ACTIVITY, {"id": team_id})
+    team = data.get("team")
+    if not isinstance(team, dict):
+        raise ExternalServiceError(
+            "Linear didn't return this team. Your API key may be from a different Linear "
+            "workspace, or you may not be a member of a private team."
+        )
+    issues = [i for i in (team.get("issues") or {}).get("nodes") or [] if isinstance(i, dict)]
+    counts: dict[str, int] = {}
+    for i in issues:
+        kind = str((i.get("state") or {}).get("type") or "unknown")
+        counts[kind] = counts.get(kind, 0) + 1
+    return {
+        "name": team.get("name", ""),
+        "key": team.get("key", ""),
+        "counts": counts,
+        "issues": [
+            {
+                "identifier": i.get("identifier", ""),
+                "title": i.get("title", ""),
+                "url": i.get("url", ""),
+                "updated_at": i.get("updatedAt", ""),
+                "completed_at": i.get("completedAt"),
+                "state": (i.get("state") or {}).get("name", ""),
+                "state_type": (i.get("state") or {}).get("type", ""),
+                "assignee": (i.get("assignee") or {}).get("name"),
+            }
+            for i in issues
+        ],
+    }

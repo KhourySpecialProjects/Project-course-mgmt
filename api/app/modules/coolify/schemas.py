@@ -181,3 +181,69 @@ class TeamSecurity(BaseModel):
 class AutoConnectResult(BaseModel):
     coolify_team: str
     message: str
+
+
+class ApiRequest(BaseModel):
+    """A raw call to the team's Coolify API, for anything the panel has no screen for."""
+
+    method: Literal["GET", "POST", "PATCH", "PUT", "DELETE"] = "GET"
+    # Under /api/v1, e.g. "/applications" or "/databases/<uuid>/backups".
+    path: str = Field(min_length=1, max_length=500)
+    body: Any = None
+
+    @field_validator("path")
+    @classmethod
+    def _safe_path(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith("/"):
+            v = f"/{v}"
+        v = v.removeprefix("/api/v1")
+        if ".." in v or "://" in v or "\\" in v or any(c.isspace() for c in v):
+            raise ValueError("Use a path under /api/v1, like /applications")
+        return v or "/"
+
+
+class ApiResponse(BaseModel):
+    status: int
+    data: Any = None
+
+
+# --- Course summary (the dashboard's "Needs attention" and team status lines) -------
+
+
+class AppSummary(BaseModel):
+    kind: ResourceKind
+    uuid: str
+    name: str
+    # e.g. "running:healthy", "exited:unhealthy"
+    status: str
+    security: SecurityInfo | None = None
+
+
+class ServerSummary(BaseModel):
+    uuid: str
+    name: str
+    ip: str
+    reachable: bool | None = None
+    # From the last update check, if there's been one.
+    update_count: int | None = None
+    security_count: int | None = None
+    reboot_required: bool | None = None
+    checked_at: datetime | None = None
+    job_running: bool = False
+
+
+class TeamSummary(BaseModel):
+    team_id: int
+    team_name: str
+    connected: bool
+    error: str | None = None
+    apps: list[AppSummary] = []
+    servers: list[ServerSummary] = []
+    # GitHub repositories ("owner/name") the team's apps deploy from.
+    repos: list[str] = []
+
+
+class CourseSummary(BaseModel):
+    teams: list[TeamSummary]
+    generated_at: datetime

@@ -30,6 +30,12 @@ class Team(TimestampMixin, Base):
         order_by="TeamLink.id",
         lazy="selectin",
     )
+    members: Mapped[list["TeamMember"]] = relationship(
+        back_populates="team",
+        cascade="all, delete-orphan",
+        order_by="TeamMember.name",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return f"<Team id={self.id} name={self.name!r}>"
@@ -61,6 +67,23 @@ class TeamLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     team: Mapped[Team] = relationship(back_populates="links")
+
+
+class TeamMember(Base):
+    """A student on a team. The GitHub username ties their commits and pull requests to them."""
+
+    __tablename__ = "team_members"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str] = mapped_column(String(320), default="")
+    github_username: Mapped[str] = mapped_column(String(100), default="")
+    # Optional, e.g. "PM" or "Tech lead".
+    role: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    team: Mapped[Team] = relationship(back_populates="members")
 
 
 class TeamCredential(Base):

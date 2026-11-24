@@ -22,14 +22,22 @@ import { useEffect, useState } from "react";
 import { AddTeamDialog } from "@/components/teams/AddTeamDialog";
 import { TeamCard } from "@/components/teams/TeamCard";
 import { api } from "@/lib/api";
-import type { Team, TeamService } from "@/lib/types";
+import type { CourseSummary, Team, TeamService } from "@/lib/types";
 import { connectCoolifyInBackground } from "@/modules/coolify/parts";
 
 // "Team 2" before "Team 10", ignoring case.
 const byName = (a: Team, b: Team) =>
   a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
 
-export function TeamsSection() {
+export function TeamsSection({
+  summary,
+  onTeamsChanged,
+}: {
+  /** Coolify's view of each team, for the status line on its card. */
+  summary?: CourseSummary;
+  /** Called after a team is added, so the summary can include it. */
+  onTeamsChanged?: () => void;
+} = {}) {
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [services, setServices] = useState<TeamService[]>([]);
   const [adding, setAdding] = useState(false);
@@ -61,6 +69,7 @@ export function TeamsSection() {
     setAdding(false);
     // Make the team's own Coolify token right away (if you have a Coolify admin token).
     if (team.links.some((l) => l.service_id === "coolify")) connectCoolifyInBackground(team.id);
+    onTeamsChanged?.();
   }
 
   return (
@@ -111,6 +120,7 @@ export function TeamsSection() {
               key={t.id}
               team={t}
               services={services}
+              summary={summary?.teams.find((s) => s.team_id === t.id)}
               onChange={upsert}
               onDeleted={remove}
             />

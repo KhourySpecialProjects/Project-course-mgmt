@@ -110,6 +110,23 @@ class CoolifyClient:
             return ExternalServiceError(f"Not found in this team's Coolify: {detail}")
         return ExternalServiceError(f"Coolify error ({err.status}): {detail}")
 
+    def raw(self, method: str, path: str, body: Any = None) -> tuple[int, Any]:
+        """Any API call, as-is: (status, response). Errors come back, not raised."""
+        url = f"{self.base}/api/v1{path}"
+        try:
+            data = http.request_json(
+                method,
+                url,
+                headers={"Authorization": f"Bearer {self._token}"},
+                body=body,
+                timeout=60,
+            )
+        except http.HttpError as err:
+            if err.status == 0:
+                raise self._error(err) from None
+            return err.status, err.body
+        return 200, data
+
     def _list(self, path: str, **params: Any) -> list[dict[str, Any]]:
         data = self._call("GET", path, params=params)
         return [d for d in data if isinstance(d, dict)] if isinstance(data, list) else []

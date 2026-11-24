@@ -61,11 +61,30 @@ export interface TeamLink {
   created_at: string;
 }
 
+export interface TeamMember {
+  id: number;
+  name: string;
+  email: string;
+  /** Ties their commits and pull requests to them. */
+  github_username: string;
+  /** Optional, e.g. "PM". */
+  role: string;
+}
+
 export interface Team {
   id: number;
   name: string;
   links: TeamLink[];
+  members: TeamMember[];
   created_at: string;
+}
+
+/** POST /teams/{id}/members/paste */
+export interface MembersPasted {
+  team: Team;
+  added: number;
+  /** Lines that weren't added, with the reason. */
+  skipped: string[];
 }
 
 /** A service that can create something for each team: a GitHub repo, a Linear team, ... */
@@ -297,4 +316,91 @@ export interface TeamSecurity {
 export interface CoolifyAutoConnect {
   coolify_team: string;
   message: string;
+}
+
+// --- Team updates (GitHub + Linear) ------------------------------------------------
+
+export interface PullInfo {
+  number: number | null;
+  title: string;
+  author: string;
+  /** open | merged | closed */
+  state: string;
+  draft: boolean;
+  updated_at: string;
+  url: string;
+}
+
+export interface RepoUpdates {
+  full_name: string;
+  /** Why it's listed: "Linked on the team card" or "Coolify deploys dev, main". */
+  source: string;
+  error: string | null;
+  url: string | null;
+  private: boolean | null;
+  branch: string | null;
+  pushed_at: string | null;
+  open_issues: number;
+  commits: { sha: string; message: string; author: string; date: string; url: string }[];
+  open_pulls: PullInfo[];
+  recent_merged: PullInfo[];
+}
+
+export interface LinearIssue {
+  identifier: string;
+  title: string;
+  url: string;
+  updated_at: string;
+  completed_at: string | null;
+  state: string;
+  /** backlog | unstarted | started | completed | canceled | triage */
+  state_type: string;
+  assignee: string | null;
+}
+
+export interface LinearUpdates {
+  error: string | null;
+  name: string | null;
+  key: string | null;
+  url: string | null;
+  counts: Record<string, number>;
+  issues: LinearIssue[];
+}
+
+// --- Course summary (GET /api/tools/coolify/summary) -------------------------------
+
+export interface AppSummary {
+  kind: CoolifyResourceKind;
+  uuid: string;
+  name: string;
+  status: string;
+  security: SecurityInfo | null;
+}
+
+export interface ServerSummary {
+  uuid: string;
+  name: string;
+  ip: string;
+  reachable: boolean | null;
+  update_count: number | null;
+  security_count: number | null;
+  reboot_required: boolean | null;
+  checked_at: string | null;
+  job_running: boolean;
+}
+
+export interface TeamSummary {
+  team_id: number;
+  team_name: string;
+  connected: boolean;
+  error: string | null;
+  apps: AppSummary[];
+  servers: ServerSummary[];
+  /** GitHub repositories ("owner/name") the team's apps deploy from. */
+  repos: string[];
+}
+
+export interface CourseSummary {
+  teams: TeamSummary[];
+  generated_at: string;
 }

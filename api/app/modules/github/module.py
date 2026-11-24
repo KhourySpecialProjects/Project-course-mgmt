@@ -13,7 +13,8 @@ Get the current user's token and the course organization inside an endpoint with
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_user
@@ -34,6 +35,84 @@ router = APIRouter(dependencies=[Depends(require_user)])
 def status(user: CurrentUser, db: DbSession) -> ToolStatus:
     """Report whether the GitHub integration is ready for the current user."""
     return status_for(module, db, user)
+
+
+# --- Team updates -------------------------------------------------------------------
+
+
+class Commit(BaseModel):
+    sha: str
+    message: str
+    author: str
+    date: str
+    url: str
+
+
+class Pull(BaseModel):
+    number: int | None
+    title: str
+    author: str
+    state: str
+    draft: bool
+    updated_at: str
+    url: str
+
+
+class RepoUpdates(BaseModel):
+    full_name: str
+    # Why it's listed: "Linked on the team card" or "Coolify deploys dev, main".
+    source: str
+    error: str | None = None
+    url: str | None = None
+    private: bool | None = None
+    branch: str | None = None
+    pushed_at: str | None = None
+    open_issues: int = 0
+    commits: list[Commit] = []
+    open_pulls: list[Pull] = []
+    recent_merged: list[Pull] = []
+
+
+def _team_repos(db: Session, team: Team) -> dict[str, str]:
+    """owner/name -> why it's included: the card's GitHub link, then Coolify's deploy repos."""
+    repos: dict[str, str] = {}
+    link = next((link for link in team.links if link.service_id == "github"), None)
+    if link and "github.com/" in link.url:
+        full = link.url.split("github.com/", 1)[1].strip("/").removesuffix(".git")
+        if full.count("/") == 1:
+            repos[full] = "Linked on the team card"
+    from app.modules.coolify.service import deployed_repos
+
+    for full, branches in deployed_repos(db, team).items():
+        why = f"Coolify deploys {', '.join(branches)}" if branches else "Deployed by Coolify"
+        key = next((r for r in repos if r.lower() == full.lower()), full)
+        repos[key] = f"{repos[key]}; {why}" if key in repos else why
+    return repos
+
+
+def team_updates(db: Session, user: User, team: Team) -> list[RepoUpdates]:
+    token = get_user_credential(db, user, "github_token")
+    out = []
+    for full, source in _team_repos(db, team).items():
+        if token is None:
+            out.append(RepoUpdates(full_name=full, source=source, error="Add your GitHub token."))
+            continue
+        try:
+            data = client.repo_activity(token, full)
+        except ExternalServiceError as err:
+            out.append(RepoUpdates(full_name=full, source=source, error=str(err)))
+            continue
+        out.append(RepoUpdates.model_validate({**data, "source": source}))
+    return out
+
+
+@router.get("/teams/{team_id}/updates", response_model=list[RepoUpdates])
+def get_team_updates(team_id: int, user: CurrentUser, db: DbSession) -> list[RepoUpdates]:
+    """Recent commits and pull requests in the team's repositories."""
+    team = db.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return team_updates(db, user, team)
 
 
 def repo_name(team_name: str) -> str:

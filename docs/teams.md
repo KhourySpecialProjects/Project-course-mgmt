@@ -71,13 +71,52 @@ If a team can't be matched, or you'd rather not use an admin token, paste a toke
 | Apps, databases, services | See status and where each runs (project / environment). **Redeploy** (apps: a fresh build without cache, pulling newer base images; services: pull the latest images), **restart**, **stop**, **start**. |
 | Apps | **Logs** (last 500 lines), **deployments** with each one's log (and cancel a running one), **environment variables** (view, add, change, delete; locked values stay hidden). Redeploy afterwards for changes to take effect. |
 | Security | Each resource's verdict from Coolify's image scans (*Update now*, *Update available*, *No fix yet*, *OK*) with critical/high/medium counts and known-exploited flags, and the full list of findings (package, version, fixed-in version, advisory). *Update now* on an app redeploys it, which is usually what fixes it. Problems in the team's own code or dependencies have to be fixed in their repository. |
+| Anything else | **Advanced: Coolify API** at the bottom of the panel calls any route of the team's Coolify API with its token, the same routes Coolify's MCP uses: backups, rollbacks, scheduled tasks, domains, and so on, with examples that fill in the team's real ids. Reading is open to any logged-in user; anything other than GET needs a superuser and asks first. |
 | Servers | **Auto image scans** on/off (Coolify then scans after each deploy and daily). **Check for updates** and **Install security updates** (or all updates) for the server's system packages. **Scan containers now** runs Grype, the scanner Coolify uses, on every running image. **Docker cleanup** frees disk space. |
 
 Server updates and *Scan containers now* aren't available through Coolify's API, so the workbench logs in to the team's server over SSH **with the key Coolify keeps for it**. The key is read through the team's token (which is why that needs read:sensitive) and never stored. These run in the background and the page follows their progress. Only apt-based servers (Ubuntu/Debian) can be updated. If Docker is updated, the team's containers restart briefly. **Servers are never rebooted automatically**; the panel shows when one needs a reboot.
 
+## Students and the team page
+
+Click a team's name (on its card) to open **its page**, `/teams/<id>`, with three tabs:
+
+- **Overview:** its links, its status line, and its **students**.
+- **Updates:** its recent GitHub and Linear work (see below).
+- **Coolify:** its Coolify panel.
+
+**Students** have a name (required), email, GitHub username, and an optional role (e.g. "PM"). Add them one at a time, or **Paste a list**: one student per line, in the order *name, email, GitHub username, role*, separated by commas or tabs, so columns copied from a spreadsheet paste straight in. Emails, `@usernames`, and github.com links are recognized wherever they are. The same email or GitHub username can't be on a team twice; skipped lines are listed with the reason. The **Add team** form takes the same list. Team cards show students' initials.
+
+A student's GitHub username ties their commits and pull requests to them: the Updates page's **By student** table shows each one's last commit, recent commits, and open pull requests, and names anyone committing who isn't on the list.
+
+## Needs attention
+
+The top of the dashboard lists what's broken or urgent across every connected team, most urgent first, each linking to the team's Coolify panel:
+
+- **Urgent:** a production app that's stopped; an app Coolify marks *Update now* or that has a **known-exploited** vulnerability (CISA KEV); a server that isn't reachable.
+- **Check:** other stopped or unhealthy apps; a server with security updates waiting (from its last update check) or needing a reboot.
+- **Setup:** a team that isn't connected to Coolify, or whose Coolify can't be read.
+
+Each team card also shows a status line: how many of its apps are running, the worst security verdict, and links to its **project repositories** (the ones its Coolify apps deploy from).
+
+These come from one read of every team's Coolify (`GET /api/tools/coolify/summary`), done in parallel and kept for a minute so the dashboard stays fast.
+
+## Updates and Team activity
+
+To check on teams' work without leaving the dashboard:
+
+- **A team's Updates page** (*⋯ → Updates* on its card, `/teams/<id>/updates`): for each of its GitHub repositories, the latest commits, open and recently merged pull requests, and open issues; and its Linear team's most recently updated issues with progress (done this week, in progress, to do). The repositories are the one linked on the card **plus every repository its Coolify apps deploy from**, so the team's real project shows up even if the card links a different repo.
+- **Team activity** (sidebar, `/activity`): every team in one table, with last commit, open and merged-this-week pull requests, and Linear progress. Teams that haven't committed in a week are marked, and *Can't see* lists what your keys can't read.
+
+Both only read, and use your own keys:
+
+- **GitHub:** private repositories need a token that can read them. Create a fine-grained token with the course organization as **resource owner** and **Contents, Pull requests, Issues: read** (the organization may need to approve it). A token without access gets "doesn't exist" from GitHub for private repos.
+- **Linear:** an API key belongs to **one workspace**. Create it while in the workspace the course uses, and make sure you can see the teams (private teams are only visible to their members and admins).
+
+Change either key on the tool's page (**Tools → GitHub / Linear → API keys → Replace**).
+
 ## The Security page
 
-**Tools → Coolify** shows every connected team at once: all deployed apps, most urgent first, with their security verdict and what to do (with **Redeploy** for *Update now* / *Update available*), and every team server with its system-update status (with **Check** and **Install security updates**). Teams without a Coolify token are listed with a link to connect them.
+**Tools → Coolify** shows every connected team at once: all deployed apps, most urgent first, with their security verdict and what to do (with **Redeploy** for *Update now* / *Update available*), and every team server with its system-update status (with **Check** and **Install security updates**, and **Check all servers for updates** to look on every server at once; checking never installs anything). Teams without a Coolify token are listed with a link to connect them.
 
 ## How names are matched
 

@@ -15,13 +15,15 @@ from sqlalchemy.orm import Session
 
 from app.core.http import ExternalServiceError
 from app.modules.base import CreatedResource, ToolModule, status_for
-from app.teams.models import Team, TeamLink
+from app.teams.models import Team, TeamLink, TeamMember
 from app.teams.schemas import (
     ConnectOutcome,
     ConnectResult,
     FoundResource,
     ServiceLookup,
     TeamLookup,
+    TeamMemberWrite,
+    parse_member_line,
 )
 from app.users.models import User
 
@@ -80,15 +82,106 @@ class NewLink:
     external_id: str = ""
 
 
-def create_team(db: Session, *, name: str, created_by: User, links: Sequence[NewLink] = ()) -> Team:
-    """Create a team, with all its links in one go (or none)."""
+def create_team(
+    db: Session,
+    *,
+    name: str,
+    created_by: User,
+    links: Sequence[NewLink] = (),
+    members: Sequence[TeamMemberWrite] = (),
+) -> Team:
+    """Create a team, with all its links and students in one go (or none)."""
     _check_name_free(db, name)
-    team = Team(name=name, created_by_id=created_by.id, links=[])
+    team = Team(name=name, created_by_id=created_by.id, links=[], members=[])
     for link in links:
         team.links.append(_new_link(db, team, link, created_by))
+    for m in members:
+        if _duplicate(team, m) is None:
+            team.members.append(TeamMember(**m.model_dump()))
     db.add(team)
     _commit_name(db, name)
     return team
+
+
+# --- Students -----------------------------------------------------------------
+
+
+def _duplicate(team: Team, m: TeamMemberWrite, *, except_id: int | None = None) -> str | None:
+    """Why ``m`` is already on the team (same email or GitHub username), if it is."""
+    for other in team.members:
+        if other.id is not None and other.id == except_id:
+            continue
+        if m.email and other.email.lower() == m.email.lower():
+            return f"{other.name} already has the email {m.email}."
+        if m.github_username and other.github_username.lower() == m.github_username.lower():
+            return f"{other.name} already has the GitHub username {m.github_username}."
+    return None
+
+
+def get_member(team: Team, member_id: int) -> TeamMember:
+    member = next((m for m in team.members if m.id == member_id), None)
+    if member is None:
+        raise TeamError("Student not found", status_code=status.HTTP_404_NOT_FOUND)
+    return member
+
+
+def add_member(db: Session, team: Team, m: TeamMemberWrite) -> Team:
+    why = _duplicate(team, m)
+    if why:
+        raise TeamError(why, status_code=status.HTTP_409_CONFLICT)
+    team.members.append(TeamMember(**m.model_dump()))
+    db.commit()
+    db.refresh(team, ["members"])
+    return team
+
+
+def update_member(db: Session, team: Team, member: TeamMember, m: TeamMemberWrite) -> Team:
+    why = _duplicate(team, m, except_id=member.id)
+    if why:
+        raise TeamError(why, status_code=status.HTTP_409_CONFLICT)
+    for key, value in m.model_dump().items():
+        setattr(member, key, value)
+    db.commit()
+    db.refresh(team, ["members"])
+    return team
+
+
+def delete_member(db: Session, team: Team, member: TeamMember) -> Team:
+    team.members.remove(member)
+    db.commit()
+    return team
+
+
+def paste_members(db: Session, team: Team, text: str) -> tuple[Team, int, list[str]]:
+    """Add one student per line. Returns the team, how many were added, and what was skipped."""
+    added, skipped = 0, []
+    for line in text.splitlines():
+        try:
+            m = parse_member_line(line)
+        except ValueError as err:
+            skipped.append(f"{line.strip()}: {_first_error(err)}")
+            continue
+        if m is None:
+            continue
+        why = _duplicate(team, m)
+        if why:
+            skipped.append(f"{line.strip()}: {why}")
+            continue
+        team.members.append(TeamMember(**m.model_dump()))
+        db.flush()  # so the next line's duplicate check sees this one
+        added += 1
+    db.commit()
+    db.refresh(team, ["members"])
+    return team, added, skipped
+
+
+def _first_error(err: ValueError) -> str:
+    errors = getattr(err, "errors", None)
+    if callable(errors):
+        items = errors()
+        if items:
+            return str(items[0].get("msg", err)).removeprefix("Value error, ")
+    return str(err)
 
 
 def rename_team(db: Session, team: Team, name: str) -> Team:

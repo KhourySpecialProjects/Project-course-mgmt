@@ -9,7 +9,7 @@ from app.core.db import Base
 from app.credentials.models import Credential
 from app.invites.models import Invite
 from app.modules.coolify.models import ServerJob
-from app.teams.models import Team, TeamCredential, TeamLink
+from app.teams.models import Team, TeamCredential, TeamLink, TeamMember
 from app.users.models import User
 
 __all__ = [
@@ -21,5 +21,6 @@ __all__ = [
     "Team",
     "TeamCredential",
     "TeamLink",
+    "TeamMember",
     "User",
 ]

@@ -22,6 +22,7 @@ POST   /api/teams/{id}/services/{service_id}        create (or find) the team's 
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 
 from app.auth.dependencies import CurrentUser, require_user
 from app.core.db import DbSession
@@ -39,6 +40,8 @@ from app.teams.schemas import (
     TeamLinkCreate,
     TeamLinkUpdate,
     TeamLookup,
+    TeamMembersPaste,
+    TeamMemberWrite,
     TeamRead,
     TeamServiceCreated,
     TeamServiceInfo,
@@ -153,7 +156,9 @@ def lookup(
 def create_team(body: TeamCreate, user: CurrentUser, db: DbSession) -> Team:
     links = [_new_link(link) for link in body.links]
     try:
-        return service.create_team(db, name=body.name, created_by=user, links=links)
+        return service.create_team(
+            db, name=body.name, created_by=user, links=links, members=body.members
+        )
     except TeamError as err:
         _raise(err)
 
@@ -169,6 +174,49 @@ def rename_team(team_id: int, body: TeamUpdate, db: DbSession) -> Team:
 @router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_team(team_id: int, db: DbSession) -> None:
     service.delete_team(db, _team(db, team_id))
+
+
+# --- Students ---------------------------------------------------------------
+
+
+class PasteResult(BaseModel):
+    team: TeamRead
+    added: int
+    # Lines that weren't added, with the reason.
+    skipped: list[str]
+
+
+@router.post("/{team_id}/members", response_model=TeamRead, status_code=status.HTTP_201_CREATED)
+def add_member(team_id: int, body: TeamMemberWrite, db: DbSession) -> Team:
+    try:
+        return service.add_member(db, _team(db, team_id), body)
+    except TeamError as err:
+        _raise(err)
+
+
+@router.post("/{team_id}/members/paste", response_model=PasteResult)
+def paste_members(team_id: int, body: TeamMembersPaste, db: DbSession) -> PasteResult:
+    """Add several students at once, one per line: "Name, email, @github, role"."""
+    team, added, skipped = service.paste_members(db, _team(db, team_id), body.text)
+    return PasteResult(team=TeamRead.model_validate(team), added=added, skipped=skipped)
+
+
+@router.patch("/{team_id}/members/{member_id}", response_model=TeamRead)
+def update_member(team_id: int, member_id: int, body: TeamMemberWrite, db: DbSession) -> Team:
+    team = _team(db, team_id)
+    try:
+        return service.update_member(db, team, service.get_member(team, member_id), body)
+    except TeamError as err:
+        _raise(err)
+
+
+@router.delete("/{team_id}/members/{member_id}", response_model=TeamRead)
+def delete_member(team_id: int, member_id: int, db: DbSession) -> Team:
+    team = _team(db, team_id)
+    try:
+        return service.delete_member(db, team, service.get_member(team, member_id))
+    except TeamError as err:
+        _raise(err)
 
 
 # --- Links ------------------------------------------------------------------

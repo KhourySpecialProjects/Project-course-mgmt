@@ -690,6 +690,55 @@ def test_auto_connect_explains_a_hidden_ssh_key(staff: TestClient, fake_http: Fa
     assert "main (root) Coolify team" in r.json()["detail"]
 
 
+def test_course_summary_reads_every_team_and_is_cached(
+    staff: TestClient, fake_http: FakeHttp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.modules.coolify import service as coolify_service
+
+    monkeypatch.setattr(coolify_service, "_summary_cache", {})
+    _setup(staff, "Before Dawn")
+    _create_team(staff, "Nimbus")  # not connected
+    _fake_coolify(fake_http)
+    fake_http.on(
+        "GET",
+        f"{C}/applications",
+        [
+            {
+                "uuid": "app1",
+                "name": "ssa dev",
+                "status": "running:healthy",
+                "git_repository": "https://github.com/org/ssa-portal.git",
+            },
+            {
+                "uuid": "app2",
+                "name": "ssa prod",
+                "status": "exited:unhealthy",
+                "git_repository": "org/ssa-portal",
+            },
+        ],
+    )
+
+    teams = {t["team_name"]: t for t in staff.get("/api/tools/coolify/summary").json()["teams"]}
+    assert teams["Nimbus"]["connected"] is False
+    bd = teams["Before Dawn"]
+    assert {a["name"]: a["status"] for a in bd["apps"]} == {
+        "ssa dev": "running:healthy",
+        "ssa prod": "exited:unhealthy",
+        "postgres": "running:healthy",
+    }
+    assert (
+        next(a for a in bd["apps"] if a["name"] == "ssa dev")["security"]["status"] == "update_now"
+    )
+    assert bd["repos"] == ["org/ssa-portal"]
+    assert [s["name"] for s in bd["servers"]] == ["before dawn server"]
+
+    calls = len(fake_http.calls)
+    staff.get("/api/tools/coolify/summary")  # cached for a minute
+    assert len(fake_http.calls) == calls
+    staff.get("/api/tools/coolify/summary", params={"refresh": True})
+    assert len(fake_http.calls) > calls
+
+
 def test_refused_logins_are_not_retried_right_away(
     staff: TestClient, fake_http: FakeHttp, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -716,3 +765,32 @@ def test_refused_logins_are_not_retried_right_away(
     staff.put("/api/credentials/me/coolify_token", json={"value": "1|a-new-root-team-token"})
     assert staff.post(url).status_code == 502
     assert len(attempts) == 2
+
+
+def test_advanced_api_reads_for_anyone_writes_for_superusers(
+    client: TestClient, fake_http: FakeHttp, make_user: Any, login: Any
+) -> None:
+    make_user("staff@example.com", is_superuser=True)
+    make_user("ta@example.com")
+    login("staff@example.com")
+    team = _setup(client)
+    url = f"/api/tools/coolify/teams/{team['id']}/api"
+    fake_http.on("GET", f"{C}/databases/db1/backups", [{"uuid": "b1", "frequency": "0 0 * * *"}])
+    fake_http.on(
+        "POST",
+        f"{C}/databases/db1/backups",
+        http.HttpError(422, {"message": "frequency is required"}),
+    )
+
+    r = client.post(url, json={"path": "/api/v1/databases/db1/backups"})
+    assert r.json() == {"status": 200, "data": [{"uuid": "b1", "frequency": "0 0 * * *"}]}
+    # Coolify's own errors come back as they are, for the person to read.
+    r = client.post(url, json={"method": "POST", "path": "databases/db1/backups", "body": {}})
+    assert r.json() == {"status": 422, "data": {"message": "frequency is required"}}
+    assert client.post(url, json={"path": "/../../etc"}).status_code == 422
+    assert client.post(url, json={"path": "https://evil.test/x"}).status_code == 422
+
+    login("ta@example.com")
+    assert client.post(url, json={"path": "/databases/db1/backups"}).json()["status"] == 200
+    r = client.post(url, json={"method": "DELETE", "path": "/databases/db1"})
+    assert r.status_code == 403

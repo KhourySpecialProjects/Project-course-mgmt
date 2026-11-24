@@ -103,6 +103,32 @@ export function CoolifyToolPage() {
     }
   }
 
+  // One update check per team server (skipping any that already have something running).
+  async function checkAllServers() {
+    const targets = (rows ?? []).flatMap((t) =>
+      t.servers.filter((s) => s.running_job?.status !== "running").map((s) => ({ t, s })),
+    );
+    let started = 0;
+    const failed: string[] = [];
+    for (const { t, s } of targets) {
+      try {
+        await api.post<ServerJob>(`/tools/coolify/teams/${t.team_id}/servers/${s.uuid}/jobs`, {
+          kind: "patch_check",
+        });
+        started++;
+      } catch (err) {
+        failed.push(`${t.team_name}: ${errorMessage(err)}`);
+      }
+    }
+    notifications.show({
+      color: failed.length ? "orange" : "teal",
+      title: `Checking ${started} server${started === 1 ? "" : "s"} for updates`,
+      message: failed.length ? failed.join(" · ") : "Refresh in a minute or two for the results.",
+      autoClose: failed.length ? false : 6000,
+    });
+    setTimeout(() => setVersion((v) => v + 1), 1500);
+  }
+
   async function startJob(team: TeamSecurity, s: CoolifyServer, kind: ServerJob["kind"]) {
     try {
       await api.post<ServerJob>(`/tools/coolify/teams/${team.team_id}/servers/${s.uuid}/jobs`, {
@@ -297,7 +323,24 @@ export function CoolifyToolPage() {
 
       {rows && servers.length > 0 && (
         <Stack gap="xs">
-          <Text fw={500}>Servers</Text>
+          <Group justify="space-between">
+            <Text fw={500}>Servers</Text>
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<IconRefresh size={14} />}
+              disabled={servers.every((x) => x.s.running_job?.status === "running")}
+              onClick={() =>
+                setConfirm({
+                  title: "Check every server for updates?",
+                  body: `Looks for system updates on all ${servers.length} team servers (it refreshes each server's package list; nothing is installed). Results show up here and on each team's page in a minute or two.`,
+                  run: checkAllServers,
+                })
+              }
+            >
+              Check all servers for updates
+            </Button>
+          </Group>
           <Table.ScrollContainer minWidth={700}>
             <Table highlightOnHover verticalSpacing="xs">
               <Table.Thead>

@@ -10,9 +10,23 @@
 // been set up yet: clicking it offers to create (or find) it. Custom links come
 // after. "Find links" in the menu links everything that already exists.
 
-import { ActionIcon, Button, Card, Group, Menu, Modal, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Avatar,
+  Anchor,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Menu,
+  Modal,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
+  IconActivity,
+  IconBrandGithub,
   IconDots,
   IconExternalLink,
   IconLink,
@@ -34,7 +48,8 @@ import {
   TeamNameForm,
 } from "@/components/teams/TeamDialogs";
 import { api } from "@/lib/api";
-import type { Team, TeamConnected, TeamLink, TeamService } from "@/lib/types";
+import type { Team, TeamConnected, TeamLink, TeamService, TeamSummary } from "@/lib/types";
+import { teamHealth } from "@/modules/coolify/health";
 import { connectCoolifyInBackground } from "@/modules/coolify/parts";
 import { ToolIcon, teamPanelHref } from "@/modules/registry";
 
@@ -48,11 +63,94 @@ type Dialog =
 interface Props {
   team: Team;
   services: TeamService[];
+  /** The team's apps and servers from Coolify, for the status line. */
+  summary?: TeamSummary;
   onChange: (team: Team) => void;
   onDeleted: (teamId: number) => void;
 }
 
-export function TeamCard({ team, services, onChange, onDeleted }: Props) {
+/**
+ * Under the buttons: how many of the team's apps are running, the worst security
+ * verdict, and its project repositories (the ones its Coolify apps deploy from).
+ */
+export function TeamStatusLine({ team, summary }: { team: Team; summary: TeamSummary }) {
+  const panel = `/teams/${team.id}/coolify`;
+  if (!summary.connected) {
+    return (
+      <Text size="xs" c="dimmed" mt="sm">
+        Coolify not connected ·{" "}
+        <Anchor component={Link} href={panel} size="xs">
+          connect
+        </Anchor>
+      </Text>
+    );
+  }
+  if (summary.error) {
+    return (
+      <Text size="xs" c="orange" mt="sm" lineClamp={1} title={summary.error}>
+        Coolify: {summary.error}
+      </Text>
+    );
+  }
+  const h = teamHealth(summary);
+  const linked = team.links.find((l) => l.service_id === "github")?.url.toLowerCase() ?? "";
+  const repos = summary.repos.filter((r) => !linked.endsWith(r.toLowerCase()));
+  return (
+    <Group gap={6} mt="sm">
+      {h.total > 0 && (
+        <Tooltip label="Apps, databases, and services running in Coolify">
+          <Badge
+            component={Link}
+            href={panel}
+            variant="dot"
+            color={h.down ? "red" : h.up === h.total ? "teal" : "orange"}
+            style={{ cursor: "pointer" }}
+          >
+            {h.up}/{h.total} running
+          </Badge>
+        </Tooltip>
+      )}
+      {h.urgent > 0 ? (
+        <Badge
+          component={Link}
+          href={panel}
+          color="red"
+          variant="light"
+          style={{ cursor: "pointer" }}
+        >
+          {h.urgent} need{h.urgent === 1 ? "s" : ""} a security update
+        </Badge>
+      ) : h.updates > 0 ? (
+        <Badge
+          component={Link}
+          href={panel}
+          color="orange"
+          variant="light"
+          style={{ cursor: "pointer" }}
+        >
+          {h.updates} update{h.updates === 1 ? "" : "s"} available
+        </Badge>
+      ) : null}
+      {repos.map((r) => (
+        <Tooltip key={r} label="Project repository (deployed by Coolify)">
+          <Anchor
+            href={`https://github.com/${r}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            size="xs"
+          >
+            <Group gap={3} component="span">
+              <IconBrandGithub size={12} />
+              {r.split("/")[1]}
+            </Group>
+          </Anchor>
+        </Tooltip>
+      ))}
+    </Group>
+  );
+}
+
+export function TeamCard({ team, services, summary, onChange, onDeleted }: Props) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const close = () => setDialog(null);
 
@@ -139,9 +237,32 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
   return (
     <Card withBorder padding="md">
       <Group justify="space-between" wrap="nowrap" gap="xs" mb="sm">
-        <Text fw={600} truncate title={team.name}>
-          {team.name}
-        </Text>
+        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+          <Anchor
+            component={Link}
+            href={`/teams/${team.id}`}
+            fw={600}
+            c="inherit"
+            truncate
+            title={`Open ${team.name}'s page`}
+          >
+            {team.name}
+          </Anchor>
+          {team.members.length > 0 && (
+            <Tooltip label={team.members.map((m) => m.name).join(", ")} multiline maw={280}>
+              <Avatar.Group spacing="xs">
+                {team.members.slice(0, 4).map((m) => (
+                  <Avatar key={m.id} size="sm" radius="xl" color="initials" name={m.name} />
+                ))}
+                {team.members.length > 4 && (
+                  <Avatar size="sm" radius="xl">
+                    +{team.members.length - 4}
+                  </Avatar>
+                )}
+              </Avatar.Group>
+            </Tooltip>
+          )}
+        </Group>
         <Menu position="bottom-end" withinPortal>
           <Menu.Target>
             <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${team.name}`}>
@@ -149,6 +270,13 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
+            <Menu.Item
+              component={Link}
+              href={`/teams/${team.id}/updates`}
+              leftSection={<IconActivity size={14} />}
+            >
+              Updates (GitHub &amp; Linear)
+            </Menu.Item>
             {services
               .filter((s) => teamPanelHref(s.id, team.id))
               .map((s) => (
@@ -225,6 +353,8 @@ export function TeamCard({ team, services, onChange, onDeleted }: Props) {
           </Button>
         ))}
       </Group>
+
+      {summary && <TeamStatusLine team={team} summary={summary} />}
 
       <Modal opened={dialog?.kind === "rename"} onClose={close} title="Rename team">
         <TeamNameForm initialName={team.name} submitLabel="Save" onSubmit={rename} />

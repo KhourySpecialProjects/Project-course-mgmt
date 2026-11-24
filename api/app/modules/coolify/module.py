@@ -35,7 +35,10 @@ from app.modules.base import CreatedResource, TeamService, ToolModule, ToolStatu
 from app.modules.coolify import digitalocean, service
 from app.modules.coolify.schemas import (
     ActionResult,
+    ApiRequest,
+    ApiResponse,
     AutoConnectResult,
+    CourseSummary,
     Deployment,
     DeploymentDetail,
     EnvVar,
@@ -113,6 +116,12 @@ Failure = (CoolifyError, ExternalServiceError)
 def course_security(user: CurrentUser, db: DbSession) -> list[TeamSecurity]:
     """Every team's image-scan results and server patch status."""
     return service.course_security(db, list_teams(db), user)
+
+
+@router.get("/summary", response_model=CourseSummary)
+def course_summary(db: DbSession, refresh: bool = False) -> CourseSummary:
+    """Every connected team's apps (status and security) and servers, kept for a minute."""
+    return service.course_summary(db, list_teams(db), refresh=refresh)
 
 
 @router.get("/teams/{team_id}/overview", response_model=PanelOverview)
@@ -279,6 +288,25 @@ def get_job(team_id: int, job_id: int, db: DbSession) -> JobRead:
         return service.get_job(db, _team(db, team_id), job_id)
     except CoolifyError as err:
         _raise(err)
+
+
+@router.post("/teams/{team_id}/api", response_model=ApiResponse)
+def coolify_api(team_id: int, body: ApiRequest, user: CurrentUser, db: DbSession) -> ApiResponse:
+    """Call the team's Coolify API directly, for anything the panel has no screen for
+    (everything Coolify's MCP does goes through these same routes).
+
+    Reading is open to any logged-in user; anything that changes Coolify needs a superuser.
+    """
+    if body.method != "GET" and not user.is_superuser:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="Only superusers can change things this way."
+        )
+    team = _team(db, team_id)
+    try:
+        code, data = service.client_for(db, team).raw(body.method, body.path, body.body)
+    except Failure as err:
+        _raise(err)
+    return ApiResponse(status=code, data=data)
 
 
 module = ToolModule(

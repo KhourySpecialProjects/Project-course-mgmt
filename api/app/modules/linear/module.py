@@ -10,7 +10,8 @@ Get the current user's key inside an endpoint with:
     api_key = get_user_credential(db, user, "linear_api_key")
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import CurrentUser, require_user
@@ -30,6 +31,65 @@ router = APIRouter(dependencies=[Depends(require_user)])
 def status(user: CurrentUser, db: DbSession) -> ToolStatus:
     """Report whether the Linear integration is ready for the current user."""
     return status_for(module, db, user)
+
+
+# --- Team updates -------------------------------------------------------------------
+
+
+class Issue(BaseModel):
+    identifier: str
+    title: str
+    url: str
+    updated_at: str
+    completed_at: str | None = None
+    state: str
+    # backlog | unstarted | started | completed | canceled | triage
+    state_type: str
+    assignee: str | None = None
+
+
+class LinearUpdates(BaseModel):
+    # Why there's nothing to show (no Linear team linked, key can't see it, ...).
+    error: str | None = None
+    name: str | None = None
+    key: str | None = None
+    url: str | None = None
+    counts: dict[str, int] = {}
+    issues: list[Issue] = []
+
+
+def team_updates(db: Session, user: User, team: Team) -> LinearUpdates:
+    link = next((link for link in team.links if link.service_id == "linear"), None)
+    api_key = get_user_credential(db, user, "linear_api_key")
+    if api_key is None:
+        return LinearUpdates(error="Add your Linear API key.")
+    team_id = link.external_id if link else ""
+    url = link.url if link else None
+    try:
+        if not team_id:
+            found, _ = client.find_team(api_key, team.name)
+            if found is None:
+                return LinearUpdates(
+                    error=(
+                        f"No Linear team for {team.name} that your API key can see. Linear keys "
+                        "belong to one workspace: make yours in the workspace the course uses, "
+                        "and make sure you can see the team (it may be private)."
+                    )
+                )
+            team_id, url = found.id, found.url
+        data = client.team_activity(api_key, team_id)
+    except ExternalServiceError as err:
+        return LinearUpdates(error=str(err), url=url)
+    return LinearUpdates.model_validate({**data, "url": url})
+
+
+@router.get("/teams/{team_id}/updates", response_model=LinearUpdates)
+def get_team_updates(team_id: int, user: CurrentUser, db: DbSession) -> LinearUpdates:
+    """The team's recently updated Linear issues and its progress."""
+    team = db.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return team_updates(db, user, team)
 
 
 def _api_key(db: Session, user: User) -> str:

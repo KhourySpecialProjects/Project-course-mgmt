@@ -21,6 +21,7 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
+  IconActivity,
   IconChevronDown,
   IconHome,
   IconKey,
@@ -119,6 +120,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <AppShell.Navbar p="xs">
         <AppShell.Section grow component={ScrollArea}>
           {navItem("/", "Dashboard", IconHome)}
+          {navItem("/activity", "Team activity", IconActivity)}
 
           <Text size="xs" fw={600} c="dimmed" tt="uppercase" px="sm" pt="md" pb={4}>
             Tools

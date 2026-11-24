@@ -63,6 +63,7 @@ import type {
   ServerJob,
   ServerJobKind,
 } from "@/lib/types";
+import { ApiConsole } from "@/modules/coolify/ApiConsole";
 import {
   DeploymentsDialog,
   EnvDialog,
@@ -93,7 +94,14 @@ interface Confirm {
   run: () => Promise<void>;
 }
 
-export function CoolifyTeamPanel({ teamId }: { teamId: number }) {
+export function CoolifyTeamPanel({
+  teamId,
+  embedded = false,
+}: {
+  teamId: number;
+  /** Shown inside the team's page: leave out the page title. */
+  embedded?: boolean;
+}) {
   const [data, setData] = useState<CoolifyOverview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -189,12 +197,16 @@ export function CoolifyTeamPanel({ teamId }: { teamId: number }) {
     <Stack gap="lg">
       <Group justify="space-between" align="flex-start">
         <div>
-          <Anchor component={Link} href="/" size="sm" c="dimmed">
-            <Group gap={4}>
-              <IconArrowLeft size={14} /> Dashboard
-            </Group>
-          </Anchor>
-          <Title order={2}>{data.team_name} · Coolify</Title>
+          {!embedded && (
+            <>
+              <Anchor component={Link} href={`/teams/${teamId}`} size="sm" c="dimmed">
+                <Group gap={4}>
+                  <IconArrowLeft size={14} /> {data.team_name}
+                </Group>
+              </Anchor>
+              <Title order={2}>{data.team_name} · Coolify</Title>
+            </>
+          )}
           <Text c="dimmed" size="sm">
             {data.coolify_team
               ? `Coolify team: ${data.coolify_team}`
@@ -298,6 +310,8 @@ export function CoolifyTeamPanel({ teamId }: { teamId: number }) {
               </Table.ScrollContainer>
             )}
           </Stack>
+
+          <ApiConsole teamId={teamId} resources={data.resources} servers={data.servers} />
         </>
       )}
 
