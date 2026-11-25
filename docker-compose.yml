@@ -66,9 +66,9 @@ services:
     environment:
       # Where the Next.js server forwards /api/* requests (see web/next.config.ts).
       API_INTERNAL_URL: http://api:8000
-      # Check for file changes by polling, so edits made on your computer are
-      # picked up reliably inside the container (on every OS).
-      WATCHPACK_POLLING: "true"
+      # Check for file changes every second, so edits made on your computer
+      # are picked up reliably inside the container (on every OS).
+      WATCH_POLL_INTERVAL_MS: "1000"
     ports:
       - "3000:3000"
     volumes:

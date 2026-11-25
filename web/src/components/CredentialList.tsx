@@ -1,9 +1,9 @@
 "use client";
 
 // A list of API keys / tokens with "Add", "Replace", and "Remove" actions.
-// Used on the Account page (personal keys) and in System settings (system-wide
-// keys). Saved values are never shown; the API only tells us whether a key is
-// set and its last 4 characters.
+// Used on the Account page (personal keys) and in System settings (a
+// superuser's personal keys plus the shared ones). Saved values are never
+// shown; the API only tells us whether a key is set and its last 4 characters.
 
 import {
   Alert,
@@ -31,9 +31,15 @@ interface Props {
   /** "/credentials/me" or "/credentials/system" */
   endpoint: string;
   emptyMessage?: string;
+  /** Only show these keys (e.g. one tool's), in this order. */
+  keys?: string[];
 }
 
-export function CredentialList({ endpoint, emptyMessage = "No API keys to configure." }: Props) {
+export function CredentialList({
+  endpoint,
+  emptyMessage = "No API keys to configure.",
+  keys,
+}: Props) {
   const [items, setItems] = useState<CredentialStatus[] | null>(null);
   const [editing, setEditing] = useState<CredentialStatus | null>(null);
   const [removing, setRemoving] = useState<CredentialStatus | null>(null);
@@ -50,11 +56,14 @@ export function CredentialList({ endpoint, emptyMessage = "No API keys to config
   }
 
   if (items === null) return <Skeleton h={120} />;
-  if (items.length === 0) return <Text c="dimmed">{emptyMessage}</Text>;
+  const shown = keys
+    ? keys.map((k) => items.find((c) => c.key === k)).filter((c) => c !== undefined)
+    : items;
+  if (shown.length === 0) return <Text c="dimmed">{emptyMessage}</Text>;
 
   return (
     <Stack>
-      {items.map((c) => (
+      {shown.map((c) => (
         <CredentialCard
           key={c.key}
           credential={c}

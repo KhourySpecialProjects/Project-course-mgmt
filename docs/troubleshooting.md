@@ -67,8 +67,8 @@ docker compose up -d --build -V web
 
 ### My changes don't show up
 
-- **API:** check `docker compose logs api` for a line like `WatchFiles detected changes ... Reloading`. If it's missing, restart the container with `docker compose restart api`.
-- **Web:** try a hard refresh (`Cmd+Shift+R` on macOS, `Ctrl+Shift+R` elsewhere). The container checks for file changes by polling (`WATCHPACK_POLLING` in `docker-compose.yml`), so updates can take a second or two to appear.
+- **API:** check `docker compose logs api` for a line like `WatchFiles detected changes ... Reloading`. If it's missing, restart the container with `docker compose restart api`. Only files under `api/app/` trigger a reload; editing tests doesn't restart the server.
+- **Web:** try a hard refresh (`Cmd+Shift+R` on macOS, `Ctrl+Shift+R` elsewhere). The container checks for file changes every second (`WATCH_POLL_INTERVAL_MS` in `docker-compose.yml`), so updates can take a second or two to appear.
 - Make sure you edited the file in this project folder and saved it.
 
 ### The web container is slow on macOS or Windows

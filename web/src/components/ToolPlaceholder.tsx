@@ -2,6 +2,7 @@
 
 import { Card, List, Stack, Text, Title } from "@mantine/core";
 
+import { ToolKeys } from "@/components/ToolKeys";
 import { ToolStatusAlert } from "@/components/ToolStatusAlert";
 
 interface Props {
@@ -20,6 +21,7 @@ export function ToolPlaceholder({ toolId, title, intro, planned }: Props) {
         <Text c="dimmed">{intro}</Text>
       </div>
       <ToolStatusAlert toolId={toolId} />
+      <ToolKeys toolId={toolId} />
       <Card withBorder>
         <Title order={5} mb="xs">
           Planned features

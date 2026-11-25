@@ -45,7 +45,7 @@ def test_tools_listing(
     make_user("someone@example.com")
     login("someone@example.com")
     tools = client.get("/api/tools").json()
-    assert {t["id"] for t in tools} == {"github", "linear"}
+    assert {t["id"] for t in tools} == {"github", "linear", "coolify"}
 
     r = client.get("/api/tools/github/status")
     assert r.status_code == 200

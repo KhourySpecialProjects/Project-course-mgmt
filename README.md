@@ -52,6 +52,7 @@ Each tier runs in its own Docker container, wired together by [`docker-compose.y
 | [Authentication](docs/authentication.md) | You're working on login, invitations, users, permissions, or the superuser. |
 | [API keys and tokens](docs/api-keys.md) | You need a key for GitHub, Linear, Anthropic, etc., or are adding one. |
 | [Database & migrations](docs/database-and-migrations.md) | You're adding or changing a table. |
+| [Teams](docs/teams.md) | You're using or changing the dashboard's team cards and the repos/projects they create. |
 | [Adding a tool module](docs/adding-a-tool-module.md) | You're building a new integration (or the real GitHub/Linear tools). |
 | [Troubleshooting](docs/troubleshooting.md) | Something isn't working. |
 | [Glossary](docs/glossary.md) | You hit a term you don't recognize. |
@@ -75,6 +76,13 @@ Setting up a practicum course means doing the same tasks over and over: creating
 - Invite users and create one team per project group.
 - Create projects, starting issues, and workflow states from course templates.
 - Monitor progress across teams: activity, issue throughput, and stalled projects.
+
+### Coolify
+
+- Create one Coolify project per team, with standard environments.
+- Deploy each team's app from its GitHub repo.
+- Set environment variables in bulk from a course template.
+- See every team's deployments at a glance: status, last deploy, and live URL.
 
 ### Future tools
 
@@ -101,10 +109,11 @@ The skeleton is in place:
 - [x] Superuser created automatically from environment variables
 - [x] User management for superusers, with one-time invite links for new users
 - [x] Encrypted API key storage: personal keys per user, system-wide keys for admins
-- [x] Tool-module registry with placeholder GitHub and Linear modules
+- [x] Tool-module registry with placeholder GitHub, Linear, and Coolify modules
 - [x] Automated tests, linting, type-checking, and CI
 - [ ] Course model (courses, students, teams, projects)
 - [ ] Roster CSV import
 - [ ] GitHub tools
 - [ ] Linear tools
+- [ ] Coolify tools
 - [ ] Background job runner with dry-run preview

@@ -14,11 +14,14 @@ import {
   ScrollArea,
   Text,
   Title,
+  Tooltip,
+  UnstyledButton,
   useComputedColorScheme,
   useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
+  IconActivity,
   IconChevronDown,
   IconHome,
   IconKey,
@@ -33,7 +36,9 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import classes from "@/components/AppLayout.module.css";
 import { useAuth } from "@/components/AuthProvider";
+import { apiKeysPath } from "@/lib/paths";
 import { toolModules } from "@/modules/registry";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -66,8 +71,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Group h="100%" px="md" justify="space-between">
           <Group gap="sm">
             <Burger opened={mobileOpen} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <IconSchool size={26} stroke={1.5} />
-            <Title order={4}>Course Workbench</Title>
+            {/* The app name doubles as a button back to the dashboard. */}
+            <Tooltip label="Go to dashboard" openDelay={300}>
+              <UnstyledButton component={Link} href="/" onClick={close} className={classes.home}>
+                <Group gap="sm" wrap="nowrap">
+                  <IconSchool size={26} stroke={1.5} />
+                  <Title order={4}>Course Workbench</Title>
+                </Group>
+              </UnstyledButton>
+            </Tooltip>
           </Group>
 
           <Group gap="xs">
@@ -91,10 +103,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </Menu.Item>
                 <Menu.Item
                   component={Link}
-                  href="/account?tab=api-keys"
+                  href={apiKeysPath(user)}
                   leftSection={<IconKey size={16} />}
                 >
-                  My API keys
+                  API keys
                 </Menu.Item>
                 <Menu.Item leftSection={<IconLogout size={16} />} onClick={logout}>
                   Log out
@@ -108,6 +120,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <AppShell.Navbar p="xs">
         <AppShell.Section grow component={ScrollArea}>
           {navItem("/", "Dashboard", IconHome)}
+          {navItem("/activity", "Team activity", IconActivity)}
 
           <Text size="xs" fw={600} c="dimmed" tt="uppercase" px="sm" pt="md" pb={4}>
             Tools
